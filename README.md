@@ -97,7 +97,7 @@ Once you explicitly allow the connection, run `node scripts/connect-claude-deskt
 
 It normally queries every 5 minutes and waits at least 15 minutes when rate limited. HUD doesn't store access tokens, log raw responses, change Claude's configuration, or refresh or rotate tokens; when the connection expires, open Claude so the app renews it. If the organization can't be determined among several, it stops reading rather than show another account's quota. Offline values are marked as snapshots, and old values are cleared on sign-out or when the account connection becomes invalid.
 
-Works with both the standalone and Microsoft Store Claude data folders on Windows. It relies on the desktop app's internal interface, not a third-party API the vendor promises to keep stable, so app updates may require adjustments. Verified with a real account on the Microsoft Store desktop app: it returns the 5-hour and 7-day quotas and their reset times.
+Works with the standalone and Microsoft Store Claude data folders on Windows, including the `%LOCALAPPDATA%\Claude-Data` folder that newer Claude versions move them to (checked first). It relies on the desktop app's internal interface, not a third-party API the vendor promises to keep stable, so app updates may require adjustments. Verified with a real account on the Microsoft Store desktop app: it returns the 5-hour and 7-day quotas and their reset times.
 
 Node.js 24.5+ is recommended on Windows; HUD uses both Node's default certificates and the Windows trusted certificate store, keeping full HTTPS validation.
 

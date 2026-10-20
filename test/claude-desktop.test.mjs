@@ -1,7 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createCipheriv, randomBytes } from 'node:crypto';
-import { ClaudeConnectionError, ClaudeDesktopQuota, decryptCache, parseDesktopUsage, selectCredential } from '../lib/claude-desktop.mjs';
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import { ClaudeConnectionError, ClaudeDesktopQuota, decryptCache, desktopDirectories, parseDesktopUsage, selectCredential } from '../lib/claude-desktop.mjs';
 
 // Entirely synthetic credentials. These tests never read real accounts or use the network.
 const time = Date.parse('2026-10-15T07:00:00Z');
@@ -22,6 +25,22 @@ test('Desktop encrypted cache validates AES-GCM and rejects unknown formats', ()
   assert.throws(() => decryptCache(encrypted.toString('base64'), key));
   encrypted.write('v20');
   assert.throws(() => decryptCache(encrypted.toString('base64'), key), { code: 'unsupported' });
+});
+
+test('Desktop data folders: the newer Claude-Data location comes first, then the classic and Store folders', async () => {
+  const base = await fs.mkdtemp(path.join(os.tmpdir(), 'hud-claude-dirs-'));
+  try {
+    const local = path.join(base, 'Local'), roaming = path.join(base, 'Roaming');
+    for (const dir of ['Claude-Data/claude_abc123', 'Claude-Data/not-claude', 'Packages/Claude_abc123', 'Packages/Other_abc123']) await fs.mkdir(path.join(local, dir), { recursive: true });
+    await fs.writeFile(path.join(local, 'Claude-Data', 'README.txt'), '');
+    assert.deepEqual(await desktopDirectories({ local, roaming }), [
+      path.join(local, 'Claude-Data', 'claude_abc123'),
+      path.join(roaming, 'Claude'),
+      path.join(local, 'Packages', 'Claude_abc123', 'LocalCache', 'Roaming', 'Claude'),
+    ]);
+    // Machines that never migrated keep working without the new folder.
+    assert.deepEqual(await desktopDirectories({ local: path.join(base, 'missing'), roaming }), [path.join(roaming, 'Claude')]);
+  } finally { await fs.rm(base, { recursive: true, force: true }); }
 });
 
 test('Desktop selects only the current account and official host, honors revocation and expiry', () => {

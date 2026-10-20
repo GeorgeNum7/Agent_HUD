@@ -97,7 +97,7 @@
 
 正常每 5 分钟查询，限流时至少等待 15 分钟。HUD 不保存访问令牌、不记录接口原始响应、不修改 Claude 配置、不刷新或轮换令牌；连接过期时需打开 Claude，由原应用续期。多组织无法确定归属时停止读取，防止显示错账户的额度。断线时标注历史快照，注销或账户连接失效时清空旧值。
 
-兼容 Windows 独立安装与 Microsoft Store 的 Claude 数据目录。依据本机桌面应用的内部接口实现，并非厂商公开承诺稳定的第三方 API，应用更新后可能需要适配。已用真实账户在 Microsoft Store 桌面版上验证，可取得 5 小时和 7 天额度及重置时间。
+兼容 Windows 独立安装与 Microsoft Store 的 Claude 数据目录，包括新版 Claude 迁移后的 `%LOCALAPPDATA%\Claude-Data` 目录（优先读取）。依据本机桌面应用的内部接口实现，并非厂商公开承诺稳定的第三方 API，应用更新后可能需要适配。已用真实账户在 Microsoft Store 桌面版上验证，可取得 5 小时和 7 天额度及重置时间。
 
 Windows 上建议使用 Node.js 24.5+；HUD 会同时使用 Node 默认证书和 Windows 系统可信证书库，保持完整 HTTPS 校验。
 
