@@ -112,6 +112,7 @@ namespace AgentHud
             dataDir = data; server = url; showSignal = signal;
             http = new HttpClient(new HttpClientHandler { UseProxy = false }) { Timeout = TimeSpan.FromSeconds(4), MaxResponseContentBufferSize = 1024 * 1024 };
             ReadState();
+            Lang.Apply(saved.language);
             Title = "Agent HUD Widget";
             Width = 260; Height = 48;
             WindowStyle = WindowStyle.None; ResizeMode = ResizeMode.NoResize;
@@ -237,7 +238,6 @@ namespace AgentHud
 
             periodButton = new Button { Content = "5h", Width = 42, Height = 46, FontSize = 11, FontWeight = FontWeights.SemiBold, RenderTransform = new ScaleTransform() };
             periodButton.SetResourceReference(StyleProperty, "GlassChip");
-            AutomationProperties.SetName(periodButton, "点击切换 5 小时 / 7 天额度");
             periodButton.Click += delegate { SetPeriod(saved.period == 300 ? 10080 : 300); };
             // Feedback on pointer-down, not release.
             periodButton.PreviewMouseLeftButtonDown += delegate { Press(periodButton, .94, 100); };
@@ -265,24 +265,43 @@ namespace AgentHud
         ContextMenu BuildMenu()
         {
             var menu = new ContextMenu();
-            var open = new MenuItem { Header = "打开完整面板" }; open.Click += delegate { OpenDashboard(); };
-            var codexUsage = new MenuItem { Header = "Codex 官方用量 ↗" }; codexUsage.Click += delegate { OpenCodexUsage(); };
-            var claudeUsage = new MenuItem { Header = "Claude 官方用量 ↗" }; claudeUsage.Click += delegate { OpenClaudeUsage(); };
-            var top = new MenuItem { Header = "始终置顶", IsCheckable = true };
+            var open = new MenuItem { Header = Lang.T("打开完整面板", "Open dashboard") }; open.Click += delegate { OpenDashboard(); };
+            var codexUsage = new MenuItem { Header = Lang.T("Codex 官方用量 ↗", "Codex usage ↗") }; codexUsage.Click += delegate { OpenCodexUsage(); };
+            var claudeUsage = new MenuItem { Header = Lang.T("Claude 官方用量 ↗", "Claude usage ↗") }; claudeUsage.Click += delegate { OpenClaudeUsage(); };
+            var top = new MenuItem { Header = Lang.T("始终置顶", "Always on top"), IsCheckable = true };
             top.Click += delegate { SetPinned(top.IsChecked); top.IsChecked = saved.pinned; };
-            var hide = new MenuItem { Header = "收起到托盘" }; hide.Click += delegate { Hide(); };
-            var reset = new MenuItem { Header = "重置小组件位置" }; reset.Click += delegate { placement.Reset(); };
-            var quit = new MenuItem { Header = "退出小组件" }; quit.Click += delegate { Close(); };
+            var hide = new MenuItem { Header = Lang.T("收起到托盘", "Hide to tray") }; hide.Click += delegate { Hide(); };
+            var reset = new MenuItem { Header = Lang.T("重置小组件位置", "Reset widget position") }; reset.Click += delegate { placement.Reset(); };
+            var language = new MenuItem { Header = LanguageSwitchText() }; language.Click += delegate { ToggleLanguage(); };
+            var quit = new MenuItem { Header = Lang.T("退出小组件", "Quit widget") }; quit.Click += delegate { Close(); };
+            // Keep "always on top" at index 4: the desktop tests drive it by position.
             menu.Items.Add(open); menu.Items.Add(codexUsage); menu.Items.Add(claudeUsage); menu.Items.Add(new Separator());
-            menu.Items.Add(top); menu.Items.Add(hide); menu.Items.Add(reset); menu.Items.Add(new Separator()); menu.Items.Add(quit);
+            menu.Items.Add(top); menu.Items.Add(hide); menu.Items.Add(reset); menu.Items.Add(language); menu.Items.Add(new Separator()); menu.Items.Add(quit);
             menu.Opened += delegate { top.IsChecked = saved.pinned; }; return menu;
+        }
+        // Written in the language it switches to, so it can be found by someone who can't read the current one.
+        static string LanguageSwitchText() { return Lang.English ? "切换到中文" : "Switch to English"; }
+        void ToggleLanguage() { SetLanguage(Lang.English ? "zh" : "en"); }
+        // Saved, then every visible string is rebuilt in place — no restart needed.
+        void SetLanguage(string language)
+        {
+            saved.language = language; Lang.Apply(language); SaveState();
+            capsule.ContextMenu = BuildMenu();
+            var oldTray = tray.ContextMenuStrip;
+            tray.Text = Lang.T("Agent HUD · 额度小组件", "Agent HUD · quota widget");
+            tray.ContextMenuStrip = BuildTrayMenu();
+            if (oldTray != null) oldTray.Dispose();
+            UpdatePin();
+            codexLabel.Invalidate(); claudeLabel.Invalidate();
+            SetPeriod(saved.period);
         }
         void SetPeriod(int period)
         {
             saved.period = period == 10080 ? 10080 : 300;
             if (periodButton == null) return;
             periodButton.Content = saved.period == 300 ? "5h" : "7d";
-            periodButton.ToolTip = saved.period == 300 ? "当前 5 小时额度 · 点击查看 7 天" : "当前 7 天额度 · 点击查看 5 小时";
+            periodButton.ToolTip = saved.period == 300 ? Lang.T("当前 5 小时额度 · 点击查看 7 天", "5-hour quota · click for 7-day") : Lang.T("当前 7 天额度 · 点击查看 5 小时", "7-day quota · click for 5-hour");
+            AutomationProperties.SetName(periodButton, Lang.T("点击切换 5 小时 / 7 天额度", "Switch between 5-hour and 7-day quota"));
             RenderData(); if (IsLoaded) SaveState();
         }
         // Shared by the pin button and the menu item, so both always agree.
@@ -298,9 +317,9 @@ namespace AgentHud
             var brush = new SolidColorBrush(saved.pinned ? palette.Accent : palette.TextMuted);
             pinShape.Stroke = brush; pinShape.Fill = saved.pinned ? brush : Brushes.Transparent;
             pinSlash.Stroke = brush; pinSlash.Visibility = saved.pinned ? Visibility.Collapsed : Visibility.Visible;
-            var action = saved.pinned ? "已置顶 · 点击取消置顶" : "未置顶 · 点击置顶";
-            pinButton.ToolTip = action + "\n右键打开更多选项";
-            AutomationProperties.SetName(pinButton, saved.pinned ? "已置顶，点击取消置顶" : "未置顶，点击置顶");
+            var action = saved.pinned ? Lang.T("已置顶 · 点击取消置顶", "Pinned · click to unpin") : Lang.T("未置顶 · 点击置顶", "Not pinned · click to pin");
+            pinButton.ToolTip = action + Lang.T("\n右键打开更多选项", "\nRight-click for more options");
+            AutomationProperties.SetName(pinButton, saved.pinned ? Lang.T("已置顶，点击取消置顶", "Pinned, click to unpin") : Lang.T("未置顶，点击置顶", "Not pinned, click to pin"));
         }
         async Task Fetch()
         {
@@ -349,7 +368,12 @@ namespace AgentHud
             var wasDegraded = degraded;
             degraded = !online;
             if (degraded != wasDegraded) rim.BorderBrush = degraded ? palette.RimOffline : palette.Rim;
-            var detail = "拖动可移动 · 靠近屏幕边缘自动贴边 · 右键打开菜单\n" + (!online ? "本地服务离线，正在自动重启；显示的是最后一次快照" : snapshot.loading ? "正在读取额度" : scanStale ? "会话扫描延迟，额度不受影响" : "每 5 秒读取本地快照；平台额度按各自频率更新") + "\n悬停圆环查看额度更新时间和重置倒计时";
+            var detail = Lang.T("拖动可移动 · 靠近屏幕边缘自动贴边 · 右键打开菜单\n", "Drag to move · snaps to screen edges · right-click for the menu\n")
+                + (!online ? Lang.T("本地服务离线，正在自动重启；显示的是最后一次快照", "Local service offline, restarting automatically; showing the last snapshot")
+                    : snapshot.loading ? Lang.T("正在读取额度", "Reading quotas")
+                    : scanStale ? Lang.T("会话扫描延迟，额度不受影响", "Session scan delayed; quotas are unaffected")
+                    : Lang.T("每 5 秒读取本地快照；平台额度按各自频率更新", "Reads the local snapshot every 5 s; each platform's quota updates on its own schedule"))
+                + Lang.T("\n悬停圆环查看额度更新时间和重置倒计时", "\nHover a ring for its update time and reset countdown");
             if (!Equals(capsule.ToolTip, detail)) capsule.ToolTip = detail;
         }
         void OpenDashboard() { try { Process.Start(new ProcessStartInfo(server.AbsoluteUri) { UseShellExecute = true }); } catch { } }
@@ -374,20 +398,25 @@ namespace AgentHud
 
         void SetupTray()
         {
-            tray = new Forms.NotifyIcon { Text = "Agent HUD · 额度小组件", Icon = CreateIcon(), Visible = true };
-            var menu = new Forms.ContextMenuStrip();
-            menu.Items.Add("显示小组件", null, delegate { Dispatcher.Invoke(new Action(ShowWidget)); });
-            menu.Items.Add("重置小组件位置", null, delegate { Dispatcher.Invoke(new Action(delegate { ShowWidget(); placement.Reset(); })); });
-            menu.Items.Add("打开完整面板", null, delegate { OpenDashboard(); });
-            menu.Items.Add("Codex 官方用量", null, delegate { OpenCodexUsage(); });
-            menu.Items.Add("Claude 官方用量", null, delegate { OpenClaudeUsage(); });
-            menu.Items.Add("收起小组件", null, delegate { Dispatcher.Invoke(new Action(Hide)); });
-            menu.Items.Add(new Forms.ToolStripSeparator());
-            menu.Items.Add("退出小组件", null, delegate { Dispatcher.Invoke(new Action(Close)); });
-            tray.ContextMenuStrip = menu;
+            tray = new Forms.NotifyIcon { Text = Lang.T("Agent HUD · 额度小组件", "Agent HUD · quota widget"), Icon = CreateIcon(), Visible = true };
+            tray.ContextMenuStrip = BuildTrayMenu();
             tray.MouseClick += delegate(object sender, Forms.MouseEventArgs e) { if (e.Button == Forms.MouseButtons.Left) Dispatcher.Invoke(new Action(ShowWidget)); };
             var iconPath = Path.Combine(dataDir, "widget.ico");
             if (!File.Exists(iconPath)) { using (var file = File.Create(iconPath)) tray.Icon.Save(file); }
+        }
+        Forms.ContextMenuStrip BuildTrayMenu()
+        {
+            var menu = new Forms.ContextMenuStrip();
+            menu.Items.Add(Lang.T("显示小组件", "Show widget"), null, delegate { Dispatcher.Invoke(new Action(ShowWidget)); });
+            menu.Items.Add(Lang.T("重置小组件位置", "Reset widget position"), null, delegate { Dispatcher.Invoke(new Action(delegate { ShowWidget(); placement.Reset(); })); });
+            menu.Items.Add(Lang.T("打开完整面板", "Open dashboard"), null, delegate { OpenDashboard(); });
+            menu.Items.Add(Lang.T("Codex 官方用量", "Codex usage"), null, delegate { OpenCodexUsage(); });
+            menu.Items.Add(Lang.T("Claude 官方用量", "Claude usage"), null, delegate { OpenClaudeUsage(); });
+            menu.Items.Add(Lang.T("收起小组件", "Hide widget"), null, delegate { Dispatcher.Invoke(new Action(Hide)); });
+            menu.Items.Add(LanguageSwitchText(), null, delegate { Dispatcher.BeginInvoke(new Action(ToggleLanguage)); });
+            menu.Items.Add(new Forms.ToolStripSeparator());
+            menu.Items.Add(Lang.T("退出小组件", "Quit widget"), null, delegate { Dispatcher.Invoke(new Action(Close)); });
+            return menu;
         }
         [System.Runtime.InteropServices.DllImport("user32.dll")] static extern bool DestroyIcon(IntPtr hIcon);
         static Drawing.Icon CreateIcon()
@@ -452,8 +481,11 @@ namespace AgentHud
             VerticalAlignment = VerticalAlignment.Center;
             name.SetResourceReference(TextBlock.ForegroundProperty, "Text");
             Children.Add(value); Children.Add(name);
-            Show(new RingValue { Caption = "等待数据" }, false);
+            Show(new RingValue(), false);
         }
+
+        // After a language switch: the next Show redraws even if the values didn't change.
+        public void Invalidate() { initialized = false; }
 
         public void Show(RingValue ring, bool offline)
         {
@@ -469,11 +501,18 @@ namespace AgentHud
                 value.SetResourceReference(TextBlock.ForegroundProperty, ring.Percent.Value < 20 ? "Low" : "Text");
                 // The logo in the ring names the platform, so this line carries when the quota resets.
                 // Offline keeps its word; without a reset time it falls back to the platform name.
-                name.Text = offline ? platform + " 离线" : badge ?? platform + (ring.Stale ? " 快照" : " 剩余");
+                // English drops the platform name where "Claude offline" / "Claude snapshot" would not fit 52 DIP.
+                name.Text = offline ? Lang.T(platform + " 离线", "Offline")
+                    : badge ?? (ring.Stale ? Lang.T(platform + " 快照", "Snapshot") : Lang.T(platform + " 剩余", platform + " left"));
             }
             else
             {
-                value.Text = offline ? "离线" : ring.Caption == "等待连接" ? "待连接" : ring.Caption == "桌面版未接入" ? "未接入" : ring.Caption == "等待额度重置" ? "待更新" : ring.Caption == "等待数据" ? "等待" : "未提供";
+                value.Text = offline ? Lang.T("离线", "Offline")
+                    : ring.Status == RingStatus.Setup ? Lang.T("待连接", "Setup")
+                    : ring.Status == RingStatus.NotLinked ? Lang.T("未接入", "No link")
+                    : ring.Status == RingStatus.Expired ? Lang.T("待更新", "Pending")
+                    : ring.Status == RingStatus.Waiting ? Lang.T("等待", "Waiting")
+                    : Lang.T("未提供", "N/A");
                 value.FontWeight = FontWeights.Normal;
                 value.SetResourceReference(TextBlock.ForegroundProperty, "Text");
                 name.Text = platform;

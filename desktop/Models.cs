@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 
 namespace AgentHud
@@ -44,65 +45,81 @@ namespace AgentHud
         public double? offsetY { get; set; }
         public bool pinned { get; set; }
         public int period { get; set; }
-        public WidgetState() { pinned = true; period = 300; }
+        // "auto" (follow Windows), "zh" or "en".
+        public string language { get; set; }
+        public WidgetState() { pinned = true; period = 300; language = "auto"; }
+    }
+    public static class RingStatus
+    {
+        // Language-independent states; the label picks its words from these, never from Caption.
+        public const string Waiting = "waiting", Setup = "setup", NotLinked = "not-linked", Unavailable = "unavailable", Expired = "expired", Live = "live";
     }
     public class RingValue
     {
         public double? Percent;
         public double? ResetsAt;
         public bool Stale;
+        public string Status = RingStatus.Waiting;
         public string Caption;
         public string Detail;
         public static double Now() { return (DateTime.UtcNow - new DateTime(1970, 1, 1)).TotalMilliseconds; }
         static readonly DateTime Epoch = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
-        static readonly string[] WeekDays = { "周日", "周一", "周二", "周三", "周四", "周五", "周六" };
+        static readonly string[] WeekDaysZh = { "周日", "周一", "周二", "周三", "周四", "周五", "周六" };
+        static readonly string[] WeekDaysEn = { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" };
 
         public static RingValue From(Provider provider, int period, double now, bool online)
         {
-            var result = new RingValue { Caption = "等待数据", Detail = "等待平台提供额度，未将未知值当作零。" };
+            var result = new RingValue { Caption = Lang.T("等待数据", "Waiting for data"), Detail = Lang.T("等待平台提供额度，未将未知值当作零。", "Waiting for the platform to report its quota; an unknown value is never treated as zero.") };
             if (provider == null) return result;
             var limits = provider.limits;
             var win = limits == null || limits.windows == null ? null : limits.windows.FirstOrDefault(w => w.windowMinutes == period);
             if (win == null || !win.remainingPercent.HasValue || Double.IsNaN(win.remainingPercent.Value) || Double.IsInfinity(win.remainingPercent.Value))
             {
-                result.Caption = provider.quotaStatus == "desktop-connection-disabled" ? "等待连接" : provider.quotaStatus == "desktop-not-connected" ? "桌面版未接入" : "额度未提供";
-                result.Detail = provider.quotaMessage ?? "这个平台还没有提供所选周期的额度。可打开完整面板查看接入状态。";
+                result.Status = provider.quotaStatus == "desktop-connection-disabled" ? RingStatus.Setup : provider.quotaStatus == "desktop-not-connected" ? RingStatus.NotLinked : RingStatus.Unavailable;
+                result.Caption = result.Status == RingStatus.Setup ? Lang.T("等待连接", "Connection not enabled") : result.Status == RingStatus.NotLinked ? Lang.T("桌面版未接入", "Desktop app not linked") : Lang.T("额度未提供", "Quota not provided");
+                result.Detail = Lang.Server(provider.quotaMessage) ?? Lang.T("这个平台还没有提供所选周期的额度。可打开完整面板查看接入状态。", "This platform hasn't reported a quota for the selected window yet. Open the dashboard to check the connection.");
                 result.Detail += "\n" + UpdatedText(limits == null ? null : limits.collectedAt, now);
-                result.Detail += provider.id == "claude" ? "\n右键小组件 → Claude 官方用量，查看当前账户额度。" : "\n右键小组件 → Codex 官方用量，查看当前账户额度。";
+                result.Detail += provider.id == "claude" ? Lang.T("\n右键小组件 → Claude 官方用量，查看当前账户额度。", "\nRight-click the widget → Claude usage to see this account's quota.") : Lang.T("\n右键小组件 → Codex 官方用量，查看当前账户额度。", "\nRight-click the widget → Codex usage to see this account's quota.");
                 return result;
             }
             if (win.resetsAt.HasValue && win.resetsAt.Value <= now)
             {
-                result.Caption = "等待额度重置";
-                result.Detail = "上次快照的重置时间已过，等待新数据；不会自动显示 100%。\n" + UpdatedText(limits.collectedAt, now);
+                result.Status = RingStatus.Expired;
+                result.Caption = Lang.T("等待额度重置", "Waiting for reset");
+                result.Detail = Lang.T("上次快照的重置时间已过，等待新数据；不会自动显示 100%。\n", "The last snapshot's reset time has passed; waiting for new data instead of assuming 100%.\n") + UpdatedText(limits.collectedAt, now);
                 return result;
             }
+            result.Status = RingStatus.Live;
             result.Percent = Math.Max(0, Math.Min(100, win.remainingPercent.Value));
             result.ResetsAt = win.resetsAt;
             result.Stale = limits.stale || !online || !limits.collectedAt.HasValue || now - limits.collectedAt.Value > (limits.staleAfterMs ?? 120000);
-            result.Caption = win.resetsAt.HasValue ? ResetText(win.resetsAt.Value - now) : "重置时间未提供";
+            result.Caption = win.resetsAt.HasValue ? ResetText(win.resetsAt.Value - now) : Lang.T("重置时间未提供", "Reset time not provided");
             var resetDate = win.resetsAt.HasValue ? LocalTime(win.resetsAt.Value) : null;
-            result.Detail = (limits.source ?? "平台额度") + "\n" + UpdatedText(limits.collectedAt, now) + "\n" + (result.Stale ? "历史快照 · " : "") + result.Caption + (resetDate.HasValue ? "（" + resetDate.Value.ToString("MM-dd HH:mm") + "）" : "");
-            if (limits.source == "Codex 官方额度接口") result.Detail += "\n正常约每 1 分钟查询，连接失败时可能延迟。";
-            else if (limits.source == "Claude 桌面账户额度") result.Detail += "\n正常约每 5 分钟查询，连接失败时可能延迟。";
-            result.Detail += "\n同一平台账户内共享，非单个 agent 的独立额度。";
-            if (!String.IsNullOrEmpty(provider.quotaMessage)) result.Detail += "\n" + provider.quotaMessage;
-            if (result.Stale) result.Caption = "快照 · " + result.Caption;
+            var resetStamp = resetDate.HasValue ? Lang.T("（" + resetDate.Value.ToString("MM-dd HH:mm") + "）", " (" + resetDate.Value.ToString("MM-dd HH:mm") + ")") : "";
+            result.Detail = (Lang.Server(limits.source) ?? Lang.T("平台额度", "Platform quota")) + "\n" + UpdatedText(limits.collectedAt, now) + "\n" + (result.Stale ? Lang.T("历史快照 · ", "Snapshot · ") : "") + result.Caption + resetStamp;
+            if (limits.source == "Codex 官方额度接口") result.Detail += Lang.T("\n正常约每 1 分钟查询，连接失败时可能延迟。", "\nNormally queried about once a minute; may lag when the connection fails.");
+            else if (limits.source == "Claude 桌面账户额度") result.Detail += Lang.T("\n正常约每 5 分钟查询，连接失败时可能延迟。", "\nNormally queried about every 5 minutes; may lag when the connection fails.");
+            result.Detail += Lang.T("\n同一平台账户内共享，非单个 agent 的独立额度。", "\nShared across the platform account, not a per-agent quota.");
+            if (!String.IsNullOrEmpty(provider.quotaMessage)) result.Detail += "\n" + Lang.Server(provider.quotaMessage);
+            if (result.Stale) result.Caption = Lang.T("快照 · ", "Snapshot · ") + result.Caption;
             return result;
         }
         public static string UpdatedText(double? collectedAt, double now)
         {
-            if (!collectedAt.HasValue) return "额度更新时间未知";
+            if (!collectedAt.HasValue) return Lang.T("额度更新时间未知", "Quota update time unknown");
             var stamp = collectedAt.Value;
-            if (Double.IsNaN(stamp) || Double.IsInfinity(stamp) || stamp > now + 60000) return "额度更新时间异常，请检查系统时间";
+            if (Double.IsNaN(stamp) || Double.IsInfinity(stamp) || stamp > now + 60000) return Lang.T("额度更新时间异常，请检查系统时间", "Quota update time looks wrong; check the system clock");
             try
             {
                 var date = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc).AddMilliseconds(stamp).ToLocalTime();
                 var minutes = Math.Floor(Math.Max(0, now - stamp) / 60000);
-                var age = minutes < 1 ? "刚刚" : minutes < 60 ? minutes + " 分钟前" : minutes < 1440 ? Math.Floor(minutes / 60) + " 小时前" : Math.Floor(minutes / 1440) + " 天前";
-                return "额度更新：" + age + "（" + date.ToString("MM-dd HH:mm") + "）";
+                var age = minutes < 1 ? Lang.T("刚刚", "just now")
+                    : minutes < 60 ? Lang.T(minutes + " 分钟前", minutes + " min ago")
+                    : minutes < 1440 ? Lang.T(Math.Floor(minutes / 60) + " 小时前", Math.Floor(minutes / 60) + " h ago")
+                    : Lang.T(Math.Floor(minutes / 1440) + " 天前", Math.Floor(minutes / 1440) + " d ago");
+                return Lang.T("额度更新：" + age + "（" + date.ToString("MM-dd HH:mm") + "）", "Quota updated " + age + " (" + date.ToString("MM-dd HH:mm") + ")");
             }
-            catch (ArgumentOutOfRangeException) { return "额度更新时间未知"; }
+            catch (ArgumentOutOfRangeException) { return Lang.T("额度更新时间未知", "Quota update time unknown"); }
         }
         static DateTime? LocalTime(double stamp)
         {
@@ -116,17 +133,19 @@ namespace AgentHud
         {
             var reset = LocalTime(resetsAt);
             if (!reset.HasValue || resetsAt <= now) return null;
-            if (resetsAt - now < 86400000) return reset.Value.ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture) + " 重置";
-            // A 7-day window can land on today's weekday next week.
+            var clock = reset.Value.ToString("HH:mm", CultureInfo.InvariantCulture);
+            if (resetsAt - now < 86400000) return Lang.T(clock + " 重置", "Resets " + clock);
+            // A 7-day window can land on today's weekday next week. ("Resets next Thu" won't fit; "Next Thu" does.)
             var nextWeek = (reset.Value.Date - LocalTime(now).Value.Date).TotalDays >= 7;
-            return (nextWeek ? "下" : "") + WeekDays[(int)reset.Value.DayOfWeek] + "重置";
+            var day = (int)reset.Value.DayOfWeek;
+            return nextWeek ? Lang.T("下" + WeekDaysZh[day] + "重置", "Next " + WeekDaysEn[day]) : Lang.T(WeekDaysZh[day] + "重置", "Resets " + WeekDaysEn[day]);
         }
         public static string ResetText(double milliseconds)
         {
             var minutes = (long)Math.Ceiling(Math.Max(0, milliseconds) / 60000);
-            if (minutes >= 1440) return String.Format("{0}天 {1}小时后重置", minutes / 1440, (minutes % 1440) / 60);
-            if (minutes >= 60) return String.Format("{0}小时 {1}分后重置", minutes / 60, minutes % 60);
-            return String.Format("{0}分钟后重置", minutes);
+            if (minutes >= 1440) return Lang.T(String.Format("{0}天 {1}小时后重置", minutes / 1440, (minutes % 1440) / 60), String.Format("Resets in {0}d {1}h", minutes / 1440, (minutes % 1440) / 60));
+            if (minutes >= 60) return Lang.T(String.Format("{0}小时 {1}分后重置", minutes / 60, minutes % 60), String.Format("Resets in {0}h {1}m", minutes / 60, minutes % 60));
+            return Lang.T(String.Format("{0}分钟后重置", minutes), String.Format("Resets in {0} min", minutes));
         }
     }
 }

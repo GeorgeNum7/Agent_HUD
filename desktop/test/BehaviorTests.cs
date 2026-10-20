@@ -43,6 +43,8 @@ namespace AgentHud.Tests
         }
         public static void Run()
         {
+            // The Chinese assertions below must not depend on the machine's display language.
+            Lang.Apply("zh");
             var now = RingValue.Now();
             Check(RingValue.UpdatedText(now - 4 * 60000, now).Contains("4 分钟前"), "quota age comes from provider collection time");
             Check(RingValue.UpdatedText(null, now).Contains("未知"), "missing timestamp is not reported as fresh");
@@ -70,6 +72,30 @@ namespace AgentHud.Tests
             Check(line.Text == "Codex 剩余", "missing reset time falls back to the platform name");
             provider.limits.windows[0].resetsAt = now - 1;
             Check(!RingValue.From(provider, 300, now, true).Percent.HasValue, "expired quota is not shown as a live percentage");
+
+            Lang.Apply("en");
+            try
+            {
+                var english = ProviderAt(now);
+                var enLive = RingValue.From(english, 300, now, true);
+                Check(RingValue.UpdatedText(now - 4 * 60000, now).Contains("4 min ago") && enLive.Detail.Contains("Resets in") && enLive.Detail.Contains("Claude desktop account"), "English tooltip translates age, countdown and the service's source name");
+                Check(RingValue.ResetBadge(stamp(new DateTime(2026, 10, 19, 14, 30, 0, DateTimeKind.Local)), monday) == "Resets 14:30", "English reset within a day shows its clock time");
+                Check(RingValue.ResetBadge(stamp(new DateTime(2026, 10, 22, 9, 0, 0, DateTimeKind.Local)), monday) == "Resets Thu", "English reset days away shows the weekday");
+                Check(RingValue.ResetBadge(stamp(new DateTime(2026, 10, 26, 9, 0, 0, DateTimeKind.Local)), monday) == "Next Mon", "English next-week reset fits the strip");
+                var enLabel = new QuotaLabel("Codex");
+                var enValue = (System.Windows.Controls.TextBlock)enLabel.Children[0];
+                var enLine = (System.Windows.Controls.TextBlock)enLabel.Children[1];
+                enLabel.Show(RingValue.From(english, 300, now, false), true);
+                Check(enLine.Text == "Offline", "English offline label");
+                english.limits.windows[0].resetsAt = null;
+                enLabel.Show(RingValue.From(english, 300, now, true), false);
+                Check(enLine.Text == "Codex left", "English fallback names the platform");
+                var setup = new Provider { id = "claude", quotaStatus = "desktop-connection-disabled", quotaMessage = "桌面版账户额度读取通道已准备好，尚未启用连接。" };
+                var setupRing = RingValue.From(setup, 300, now, true);
+                enLabel.Show(setupRing, false);
+                Check(enValue.Text == "Setup" && setupRing.Detail.StartsWith("The Claude desktop account connection"), "English status words come from status codes, not Chinese captions");
+            }
+            finally { Lang.Apply("zh"); }
 
             var areas = new[] { new Rect(-1920, 0, 1920, 1040), new Rect(0, 0, 2560, 1400), new Rect(3000, 300, 1920, 1040) };
             var gap = new Rect(2700, 100, 260, 48);

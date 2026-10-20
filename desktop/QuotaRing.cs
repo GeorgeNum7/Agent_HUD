@@ -47,7 +47,8 @@ namespace AgentHud
             var staleChanged = Stale != value.Stale;
             Percent = value.Percent; Stale = value.Stale;
             if (!Equals(ToolTip, value.Detail)) ToolTip = value.Detail;
-            var name = Platform + " 剩余额度 " + (Percent.HasValue ? Percent.Value.ToString("0.#") + "%" : "未提供") + (Stale ? "，历史快照" : "");
+            var amount = Percent.HasValue ? Percent.Value.ToString("0.#") + "%" : Lang.T("未提供", "not provided");
+            var name = Platform + Lang.T(" 剩余额度 " + amount + (Stale ? "，历史快照" : ""), " quota remaining " + amount + (Stale ? ", snapshot" : ""));
             if (AutomationProperties.GetName(this) != name) AutomationProperties.SetName(this, name);
             if (changed)
             {

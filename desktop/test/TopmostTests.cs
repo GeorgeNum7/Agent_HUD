@@ -95,6 +95,13 @@ namespace AgentHud.Tests
                     Check(!NativePinned(hud) && !hud.Topmost, "pin button click unpins");
                     ClickPin(hud);
                     Check(NativePinned(hud) && hud.Topmost, "second pin button click pins again");
+                    var setLanguage = typeof(HudWindow).GetMethod("SetLanguage", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                    setLanguage.Invoke(hud, new object[] { "en" }); Pump();
+                    var englishMenu = ((FrameworkElement)hud.Content).ContextMenu;
+                    Check((string)((MenuItem)englishMenu.Items[4]).Header == "Always on top" && (string)((MenuItem)englishMenu.Items[7]).Header == "切换到中文" && AutomationProperties.GetName(FindPinButton(hud)).StartsWith("Pinned"), "switching to English rebuilds the menu and pin labels live");
+                    Check(NativePinned(hud), "language switch keeps the window pinned");
+                    setLanguage.Invoke(hud, new object[] { "zh" }); Pump();
+                    Check((string)((MenuItem)((FrameworkElement)hud.Content).ContextMenu.Items[4]).Header == "始终置顶", "switching back restores Chinese");
                     var menu = ((FrameworkElement)hud.Content).ContextMenu;
                     menu.PlacementTarget = (UIElement)hud.Content;
                     menu.IsOpen = true; Pump(); menu.IsOpen = false; Pump();
