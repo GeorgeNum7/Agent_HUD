@@ -1,8 +1,44 @@
-# Agent HUD
+<p align="center">
+  <img src="public/icon.svg" width="72" alt="">
+</p>
 
-English | [简体中文](README.zh-CN.md)
+<h1 align="center">Agent HUD</h1>
 
-A local usage dashboard and Windows desktop widget for Codex and Claude Code. No npm dependencies; Node.js 22+.
+<p align="center">
+  Codex + Claude Code usage and quota at a glance — a local dashboard and a glassy Windows desktop widget.
+</p>
+
+<p align="center">
+  <img alt="Windows 10 / 11" src="https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4?style=flat-square">
+  <img alt="Node.js 22+" src="https://img.shields.io/badge/Node.js-22%2B-3C873A?style=flat-square&logo=nodedotjs&logoColor=white">
+  <img alt="Zero npm dependencies" src="https://img.shields.io/badge/npm%20dependencies-0-34C759?style=flat-square">
+  <img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-6E6E73?style=flat-square">
+</p>
+
+<p align="center">
+  English | <a href="README.zh-CN.md">简体中文</a>
+</p>
+
+<p align="center">
+  <img src="docs/images/widget-en.png" width="625" alt="Desktop widget: Codex and Claude quota rings with their logos, remaining percentage and reset time">
+</p>
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/dashboard-dark.png">
+    <img src="docs/images/dashboard-light.png" width="880" alt="Dashboard: account quotas, usage summary and a seven-day usage chart">
+  </picture>
+  <br>
+  <sub>Screenshots use demo data. The dashboard interface is in Chinese; the widget speaks English and Chinese.</sub>
+</p>
+
+## Highlights
+
+- 🪟 **Desktop widget** — a frosted-glass strip that blurs what's behind it, with brand-colored rings, the remaining percentage and when each quota resets.
+- 📊 **Dashboard** — account quotas, token usage, cache hit rate, a seven-day chart and every agent session, in light or dark.
+- 🔒 **Local only** — reads your own Codex / Claude Code logs, binds to 127.0.0.1, never stores prompts or credentials.
+- 📌 **Stays out of the way** — one-click pin, snaps to screen edges, restarts its own service if it stops.
+- 🌐 **English / 中文** — the widget follows your Windows language, switchable from its menu.
 
 ## Quick start
 
