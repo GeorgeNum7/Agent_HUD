@@ -20,7 +20,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/images/widget-en.png" width="625" alt="Desktop widget: Codex and Claude quota rings with their logos, remaining percentage and reset time">
+  <img src="docs/images/widget-en.png" width="675" alt="Desktop widget: Codex and Claude quota rings with their logos, remaining percentage and reset time">
 </p>
 
 <p align="center">
@@ -71,15 +71,15 @@ Reference: [Codex App Server documentation](https://learn.chatgpt.com/docs/app-s
 
 The widget runs `desktop/bin/AgentHUD.exe` directly and brings the local quota service back on its own. Earlier versions launched through `Agent HUD.vbs` and `start-widget.ps1`, which antivirus software (Norton) quarantined, so the entry point no longer depends on scripts. On the first run of a freshly built exe, some antivirus products hold it for tens of seconds while scanning.
 
-The widget is a 260 × 48 DIP frosted-glass strip: it blurs whatever is behind it live, uses Windows 11's native rounded corners, scales with Windows display scaling to roughly taskbar height, and follows the Windows app light/dark theme (matching the dashboard). With Windows transparency effects off it switches to an opaque background. The rings use each brand's colors (Codex's blue-violet gradient, Claude's clay orange) with the brand's mark in the center and the remaining percentage beside it; the percentage turns red below 20%.
+The widget is a 300 × 48 DIP frosted-glass strip: it blurs whatever is behind it live, uses Windows 11's native rounded corners, scales with Windows display scaling to roughly taskbar height, and follows the Windows app light/dark theme (matching the dashboard). With Windows transparency effects off it switches to an opaque background. The rings use each brand's colors (Codex's blue-violet gradient, Claude's clay orange) with the brand's mark in the center and the remaining percentage beside it; the percentage turns red below 20%.
 
-Drag empty space to move it. On release it snaps to the edge of the screen's work area when close, and it remembers the monitor and relative position. Restored positions avoid the taskbar and gaps between monitors, are corrected after display or scaling changes, and fall back to the primary screen if the original one is gone. Both the right-click menu and the tray menu offer *Reset widget position*.
+Drag empty space to move it. On release it snaps to the edge of the screen's work area when close, and it remembers the monitor and relative position. Restored positions avoid the taskbar and gaps between monitors, are corrected after display or scaling changes, and fall back to the primary screen if the original one is gone. Both the ⋯ menu and the tray menu offer *Reset widget position*.
 
 `5h` / `7d` on the right switches the quota window. Under each percentage is the quota's reset time: the clock time when it's within a day ("Resets 14:30"), otherwise the weekday ("Resets Thu", or "Next Thu" when it falls on the same weekday next week). It reads "Offline" when the local service is offline, and "Codex left" / "Claude left" when the platform gives no reset time. Hover a ring for when the quota was actually collected, how long ago that was, the reset countdown, the full date, and the source. Local snapshots are read every 5 seconds; Codex's official quota is normally queried about once a minute and Claude's desktop quota about every 5 minutes, and both may lag when connections fail. An unknown time is never shown as "just now".
 
-A solid blue pin means always-on-top; a hollow pin with a slash means not pinned. Click the pin once to pin, again to unpin. Right-click the widget for the menu: toggle always-on-top, open the dashboard or the Codex / Claude usage pages, hide to the tray, switch language, or quit.
+A solid blue pin means always-on-top; a hollow pin with a slash means not pinned. Click the pin once to pin, again to unpin. The ⋯ to the right of `5h` / `7d` opens the menu: toggle always-on-top, open the dashboard or the Codex / Claude usage pages, hide to the tray, reset the position, or quit.
 
-The widget comes in English and Chinese. By default it follows the Windows display language; *Switch to English* / *切换到中文* in the right-click or tray menu changes it on the spot, and the choice is saved. Status text that the local service sends (quota sources, connection messages) is translated too.
+The widget comes in English and Chinese. By default it follows the Windows display language; the **EN** / **中** button left of the pin (or *Switch to English* / *切换到中文* in the tray menu) changes it on the spot, and the choice is saved. Status text that the local service sends (quota sources, connection messages) is translated too.
 
 When the local service is offline the edge turns orange and the widget shows "Offline"; after two failed reads in a row it restarts the service with `start.ps1` (at most once a minute). Rings aren't redrawn when nothing changed; when hidden, the widget stops UI updates and animation but keeps fetching, and shows the latest snapshot as soon as it's restored. Tray and exit signals are event-driven rather than polled every second.
 
@@ -127,7 +127,7 @@ Other platforms can be added as adapters in `lib/collector.mjs`, reusing the com
 
 `npm test` or `node --test test/*.test.mjs`. Covers cache accounting, reasoning not double-counted, streamed-response deduplication, inherited-record exclusion, empty quotas, reset times and incremental reads.
 
-Windows desktop regression: `powershell -ExecutionPolicy Bypass -File desktop/test.ps1`. It briefly shows separate test windows and uses its own state under `.data/desktop-tests`, without touching your real widget's position or settings. Covers always-on-top recovery, pin-click toggling, language switching, not stealing focus, tray show and exit signals, update and reset-time display, positioning across monitor gaps / negative coordinates / unplugged screens / scaling, correcting real out-of-bounds windows, no rendering while hidden, and no redraw of unchanged rings. Real multi-monitor hot-plugging and dragging between monitors with different DPI still need checking on matching hardware.
+Windows desktop regression: `powershell -ExecutionPolicy Bypass -File desktop/test.ps1`. It briefly shows separate test windows and uses its own state under `.data/desktop-tests`, without touching your real widget's position or settings. Covers always-on-top recovery, pin-click toggling, the ⋯ menu and its placement, the language button, not stealing focus, tray show and exit signals, update and reset-time display, positioning across monitor gaps / negative coordinates / unplugged screens / scaling, correcting real out-of-bounds windows, no rendering while hidden, and no redraw of unchanged rings. Real multi-monitor hot-plugging and dragging between monitors with different DPI still need checking on matching hardware.
 
 Update regression: `powershell -ExecutionPolicy Bypass -File desktop/test-launcher.ps1`, using a temporary project and background test processes. Covers first build, skipping unchanged sources, content checks when timestamps don't change, ordered replacement, and keeping the old process and binary when compilation fails; compatible with Windows PowerShell 5.1.
 

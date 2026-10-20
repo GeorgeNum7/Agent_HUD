@@ -31,32 +31,33 @@ namespace AgentHud.Tests
             if (!condition) throw new Exception(message);
             Console.WriteLine("PASS " + message);
         }
+        static ContextMenu Menu(HudWindow hud) { return (ContextMenu)typeof(HudWindow).GetField("menu", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(hud); }
         static void Toggle(HudWindow hud, bool pinned)
         {
-            var menu = ((FrameworkElement)hud.Content).ContextMenu;
-            var item = (MenuItem)menu.Items[4];
+            var item = (MenuItem)Menu(hud).Items[4];
             item.IsChecked = pinned;
             item.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
             Pump();
         }
-        static Button FindPinButton(DependencyObject node)
+        static Button FindButton(DependencyObject node, string automationId)
         {
             var button = node as Button;
-            if (button != null && AutomationProperties.GetAutomationId(button) == "PinButton") return button;
+            if (button != null && AutomationProperties.GetAutomationId(button) == automationId) return button;
             for (var i = 0; i < VisualTreeHelper.GetChildrenCount(node); i++)
             {
-                var found = FindPinButton(VisualTreeHelper.GetChild(node, i));
+                var found = FindButton(VisualTreeHelper.GetChild(node, i), automationId);
                 if (found != null) return found;
             }
             return null;
         }
-        static void ClickPin(HudWindow hud)
+        static void Click(HudWindow hud, string automationId)
         {
-            var button = FindPinButton(hud);
-            if (button == null) throw new Exception("pin button not found");
+            var button = FindButton(hud, automationId);
+            if (button == null) throw new Exception(automationId + " not found");
             button.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             Pump();
         }
+        static string Header(HudWindow hud, int index) { return (string)((MenuItem)Menu(hud).Items[index]).Header; }
         [STAThread]
         public static int Main(string[] args)
         {
@@ -91,21 +92,28 @@ namespace AgentHud.Tests
                     Check(!NativePinned(hud), "unpin survives hide/show");
                     Toggle(hud, true);
                     Check(NativePinned(hud) && hud.Topmost, "pin restores managed and native state");
-                    ClickPin(hud);
+                    Click(hud, "PinButton");
                     Check(!NativePinned(hud) && !hud.Topmost, "pin button click unpins");
-                    ClickPin(hud);
+                    Click(hud, "PinButton");
                     Check(NativePinned(hud) && hud.Topmost, "second pin button click pins again");
-                    var setLanguage = typeof(HudWindow).GetMethod("SetLanguage", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-                    setLanguage.Invoke(hud, new object[] { "en" }); Pump();
-                    var englishMenu = ((FrameworkElement)hud.Content).ContextMenu;
-                    Check((string)((MenuItem)englishMenu.Items[4]).Header == "Always on top" && (string)((MenuItem)englishMenu.Items[7]).Header == "切换到中文" && AutomationProperties.GetName(FindPinButton(hud)).StartsWith("Pinned"), "switching to English rebuilds the menu and pin labels live");
-                    Check(NativePinned(hud), "language switch keeps the window pinned");
-                    setLanguage.Invoke(hud, new object[] { "zh" }); Pump();
-                    Check((string)((MenuItem)((FrameworkElement)hud.Content).ContextMenu.Items[4]).Header == "始终置顶", "switching back restores Chinese");
-                    var menu = ((FrameworkElement)hud.Content).ContextMenu;
-                    menu.PlacementTarget = (UIElement)hud.Content;
-                    menu.IsOpen = true; Pump(); menu.IsOpen = false; Pump();
+                    Check(((FrameworkElement)hud.Content).ContextMenu == null, "right-click on the strip no longer opens a menu");
+                    Click(hud, "MoreButton");
+                    var menu = Menu(hud);
+                    var strip = (FrameworkElement)hud.Content;
+                    var stripCorner = strip.PointToScreen(new Point(strip.ActualWidth, strip.ActualHeight));
+                    // The template's 14 DIP shadow margin surrounds the visible menu.
+                    var menuCorner = menu.PointToScreen(new Point(menu.ActualWidth - 14, 14));
+                    Console.WriteLine("Strip bottom-right " + stripCorner + ", menu top-right " + menuCorner);
+                    Check(menu.IsOpen && Math.Abs(menuCorner.X - stripCorner.X) <= 3 && menuCorner.Y > stripCorner.Y && menuCorner.Y - stripCorner.Y < 20, "the more button opens the menu right-aligned just below the strip");
+                    menu.IsOpen = false; Pump();
                     Check(NativePinned(hud), "opening and closing the menu preserves pinning");
+                    // Start from Chinese whatever the machine's display language, so the toggle direction is known.
+                    typeof(HudWindow).GetMethod("SetLanguage", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).Invoke(hud, new object[] { "zh" }); Pump();
+                    Click(hud, "LanguageButton");
+                    Check(Header(hud, 4) == "Always on top" && AutomationProperties.GetName(FindButton(hud, "LanguageButton")) == "切换到中文" && AutomationProperties.GetName(FindButton(hud, "MoreButton")) == "More options" && AutomationProperties.GetName(FindButton(hud, "PinButton")).StartsWith("Pinned"), "the language button switches the menu and button labels to English live");
+                    Check(NativePinned(hud), "language switch keeps the window pinned");
+                    Click(hud, "LanguageButton");
+                    Check(Header(hud, 4) == "始终置顶" && AutomationProperties.GetName(FindButton(hud, "LanguageButton")) == "Switch to English", "a second click switches back to Chinese");
                     var foreground = GetForegroundWindow();
                     // Reproduce a native z-order change without changing WPF's cached Topmost value.
                     Check(SetWindowPos(handle, new IntPtr(-2), 0, 0, 0, 0, 0x213), "native demotion succeeded");

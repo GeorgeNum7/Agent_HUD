@@ -79,7 +79,7 @@ namespace AgentHud
                 result.Caption = result.Status == RingStatus.Setup ? Lang.T("等待连接", "Connection not enabled") : result.Status == RingStatus.NotLinked ? Lang.T("桌面版未接入", "Desktop app not linked") : Lang.T("额度未提供", "Quota not provided");
                 result.Detail = Lang.Server(provider.quotaMessage) ?? Lang.T("这个平台还没有提供所选周期的额度。可打开完整面板查看接入状态。", "This platform hasn't reported a quota for the selected window yet. Open the dashboard to check the connection.");
                 result.Detail += "\n" + UpdatedText(limits == null ? null : limits.collectedAt, now);
-                result.Detail += provider.id == "claude" ? Lang.T("\n右键小组件 → Claude 官方用量，查看当前账户额度。", "\nRight-click the widget → Claude usage to see this account's quota.") : Lang.T("\n右键小组件 → Codex 官方用量，查看当前账户额度。", "\nRight-click the widget → Codex usage to see this account's quota.");
+                result.Detail += provider.id == "claude" ? Lang.T("\n点 ⋯ → Claude 官方用量，查看当前账户额度。", "\n⋯ → Claude usage shows this account's quota.") : Lang.T("\n点 ⋯ → Codex 官方用量，查看当前账户额度。", "\n⋯ → Codex usage shows this account's quota.");
                 return result;
             }
             if (win.resetsAt.HasValue && win.resetsAt.Value <= now)

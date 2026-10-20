@@ -180,7 +180,7 @@ namespace AgentHud
     <Setter Property='Focusable' Value='False'/>
     <Setter Property='Template'><Setter.Value><ControlTemplate TargetType='Button'>
       <Grid Background='Transparent'>
-        <Border x:Name='Bd' Width='20' Height='30' CornerRadius='10' Background='Transparent'/>
+        <Border x:Name='Bd' Height='30' Margin='1,0' CornerRadius='10' Background='Transparent'/>
         <ContentPresenter HorizontalAlignment='Center' VerticalAlignment='Center'/>
       </Grid>
       <ControlTemplate.Triggers>

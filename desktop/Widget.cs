@@ -97,11 +97,13 @@ namespace AgentHud
         readonly Border rim = new Border { BorderThickness = new Thickness(1), Margin = new Thickness(1), IsHitTestVisible = false };
         readonly System.Windows.Shapes.Path pinShape = new System.Windows.Shapes.Path { Data = Geometry.Parse("M5,2 H11 L10.3,7.3 L12.5,10 H3.5 L5.7,7.3 Z M8,10 V14.5"), StrokeThickness = 1.4, StrokeLineJoin = PenLineJoin.Round, StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round };
         readonly System.Windows.Shapes.Path pinSlash = new System.Windows.Shapes.Path { Data = Geometry.Parse("M2,2 L14,14"), StrokeThickness = 1.5, StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round };
+        readonly TextBlock langText = new TextBlock { FontSize = 8.5, FontWeight = FontWeights.SemiBold, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
         Grid capsule;
         Palette palette;
         WidgetState saved = new WidgetState();
         Snapshot snapshot;
-        Button periodButton, pinButton;
+        Button periodButton, pinButton, langButton, moreButton;
+        ContextMenu menu;
         Forms.NotifyIcon tray;
         bool busy, online, exiting, degraded;
         double lastServiceStart;
@@ -114,7 +116,7 @@ namespace AgentHud
             ReadState();
             Lang.Apply(saved.language);
             Title = "Agent HUD Widget";
-            Width = 260; Height = 48;
+            Width = 300; Height = 48;
             WindowStyle = WindowStyle.None; ResizeMode = ResizeMode.NoResize;
             // Not a layered window: DWM only honours the capsule region for the blur on regular windows.
             // The glass frame spans the whole client area so transparent pixels show the blurred backdrop.
@@ -214,8 +216,8 @@ namespace AgentHud
             capsule = new Grid { Cursor = Cursors.SizeAll, Background = Brushes.Transparent };
             capsule.Children.Add(tint); capsule.Children.Add(sheen); capsule.Children.Add(edge); capsule.Children.Add(rim);
             var body = new Grid();
-            // The two buttons get the strip's full height as hit area (the visible chip stays small).
-            foreach (var width in new[] { 7.0, 34, 5, 52, 5, 34, 5, 52, -1, 22, 42, 2 })
+            // Language · pin · period · more: each button gets the strip's full height as hit area (the visible chip stays small).
+            foreach (var width in new[] { 7.0, 34, 5, 52, 5, 34, 5, 52, -1, 24, 22, 40, 18, 2 })
                 body.ColumnDefinitions.Add(new ColumnDefinition { Width = width < 0 ? new GridLength(1, GridUnitType.Star) : new GridLength(width) });
             capsule.Children.Add(body);
             codex.VerticalAlignment = VerticalAlignment.Center; Grid.SetColumn(codex, 1); body.Children.Add(codex);
@@ -223,27 +225,35 @@ namespace AgentHud
             claude.VerticalAlignment = VerticalAlignment.Center; Grid.SetColumn(claude, 5); body.Children.Add(claude);
             Grid.SetColumn(claudeLabel, 7); body.Children.Add(claudeLabel);
 
-            capsule.ContextMenu = BuildMenu();
+            // Same mark as the dashboard's language button: the language it switches to, in a rounded outline.
+            langText.SetResourceReference(TextBlock.ForegroundProperty, "Text");
+            var langGlyph = new Border { MinWidth = 17, Height = 13, CornerRadius = new CornerRadius(3.5), BorderThickness = new Thickness(1.1), Padding = new Thickness(2, 0, 2, 0), Child = langText, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+            langGlyph.SetResourceReference(Border.BorderBrushProperty, "Text");
+            langButton = IconButton(langGlyph, 24, "LanguageButton", 9);
+            langButton.Click += delegate { ToggleLanguage(); };
+
             var pinIcon = new Grid { Width = 16, Height = 16, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center };
             pinIcon.Children.Add(pinShape); pinIcon.Children.Add(pinSlash);
-            // One click pins, the next unpins; the full menu stays on right-click anywhere on the strip.
-            pinButton = new Button { Content = pinIcon, Width = 22, Height = 46, RenderTransform = new ScaleTransform(), RenderTransformOrigin = new Point(.5, .5) };
-            pinButton.SetResourceReference(StyleProperty, "IconChip");
-            AutomationProperties.SetAutomationId(pinButton, "PinButton");
+            // One click pins, the next unpins.
+            pinButton = IconButton(pinIcon, 22, "PinButton", 10);
             pinButton.Click += delegate { SetPinned(!saved.pinned); };
-            pinButton.PreviewMouseLeftButtonDown += delegate { Press(pinButton, .9, 100); };
-            pinButton.PreviewMouseLeftButtonUp += delegate { Press(pinButton, 1, 220); };
-            pinButton.MouseLeave += delegate { Press(pinButton, 1, 220); };
-            Grid.SetColumn(pinButton, 9); body.Children.Add(pinButton);
 
-            periodButton = new Button { Content = "5h", Width = 42, Height = 46, FontSize = 11, FontWeight = FontWeights.SemiBold, RenderTransform = new ScaleTransform() };
+            periodButton = new Button { Content = "5h", Width = 40, Height = 46, FontSize = 11, FontWeight = FontWeights.SemiBold, RenderTransform = new ScaleTransform() };
             periodButton.SetResourceReference(StyleProperty, "GlassChip");
             periodButton.Click += delegate { SetPeriod(saved.period == 300 ? 10080 : 300); };
-            // Feedback on pointer-down, not release.
-            periodButton.PreviewMouseLeftButtonDown += delegate { Press(periodButton, .94, 100); };
-            periodButton.PreviewMouseLeftButtonUp += delegate { Press(periodButton, 1, 220); };
-            periodButton.MouseLeave += delegate { Press(periodButton, 1, 220); };
-            Grid.SetColumn(periodButton, 10); body.Children.Add(periodButton);
+            AddPressFeedback(periodButton, .94);
+            Grid.SetColumn(periodButton, 11); body.Children.Add(periodButton);
+
+            // The menu lives behind ⋯ rather than on right-click, so it can be found by looking.
+            var dots = new GeometryGroup();
+            foreach (var x in new[] { 1.5, 6, 10.5 }) dots.Children.Add(new EllipseGeometry(new Point(x, 1.5), 1.35, 1.35));
+            var dotsShape = new System.Windows.Shapes.Path { Data = dots, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+            dotsShape.SetResourceReference(System.Windows.Shapes.Shape.FillProperty, "Text");
+            moreButton = IconButton(dotsShape, 18, "MoreButton", 12);
+            moreButton.Click += delegate { OpenMenu(); };
+            menu = BuildMenu();
+            UpdateLanguageButton();
+            body.Children.Add(langButton); body.Children.Add(pinButton); body.Children.Add(moreButton);
 
             capsule.MouseLeftButtonDown += delegate(object sender, MouseButtonEventArgs e)
             {
@@ -254,6 +264,22 @@ namespace AgentHud
             return capsule;
         }
 
+        static Button IconButton(UIElement content, double width, string automationId, int column)
+        {
+            var button = new Button { Content = content, Width = width, Height = 46, RenderTransform = new ScaleTransform(), RenderTransformOrigin = new Point(.5, .5) };
+            button.SetResourceReference(StyleProperty, "IconChip");
+            AutomationProperties.SetAutomationId(button, automationId);
+            AddPressFeedback(button, .9);
+            Grid.SetColumn(button, column);
+            return button;
+        }
+        // Feedback on pointer-down, not release.
+        static void AddPressFeedback(Button button, double scale)
+        {
+            button.PreviewMouseLeftButtonDown += delegate { Press(button, scale, 100); };
+            button.PreviewMouseLeftButtonUp += delegate { Press(button, 1, 220); };
+            button.MouseLeave += delegate { Press(button, 1, 220); };
+        }
         // Starts from the current scale, so a quick tap reverses mid-flight; no overshoot.
         static void Press(UIElement element, double to, int milliseconds)
         {
@@ -272,21 +298,40 @@ namespace AgentHud
             top.Click += delegate { SetPinned(top.IsChecked); top.IsChecked = saved.pinned; };
             var hide = new MenuItem { Header = Lang.T("收起到托盘", "Hide to tray") }; hide.Click += delegate { Hide(); };
             var reset = new MenuItem { Header = Lang.T("重置小组件位置", "Reset widget position") }; reset.Click += delegate { placement.Reset(); };
-            var language = new MenuItem { Header = LanguageSwitchText() }; language.Click += delegate { ToggleLanguage(); };
             var quit = new MenuItem { Header = Lang.T("退出小组件", "Quit widget") }; quit.Click += delegate { Close(); };
             // Keep "always on top" at index 4: the desktop tests drive it by position.
             menu.Items.Add(open); menu.Items.Add(codexUsage); menu.Items.Add(claudeUsage); menu.Items.Add(new Separator());
-            menu.Items.Add(top); menu.Items.Add(hide); menu.Items.Add(reset); menu.Items.Add(language); menu.Items.Add(new Separator()); menu.Items.Add(quit);
+            menu.Items.Add(top); menu.Items.Add(hide); menu.Items.Add(reset); menu.Items.Add(new Separator()); menu.Items.Add(quit);
             menu.Opened += delegate { top.IsChecked = saved.pinned; }; return menu;
+        }
+        // Drops below the strip, right-aligned with it. The menu template keeps a 14 DIP transparent
+        // margin for its shadow, so the offsets cancel it; WPF flips the menu above near the screen bottom.
+        void OpenMenu()
+        {
+            menu.PlacementTarget = capsule; menu.Placement = PlacementMode.Bottom;
+            menu.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+            menu.HorizontalOffset = capsule.ActualWidth - menu.DesiredSize.Width + 14;
+            menu.VerticalOffset = -14 + 6;
+            menu.IsOpen = true;
         }
         // Written in the language it switches to, so it can be found by someone who can't read the current one.
         static string LanguageSwitchText() { return Lang.English ? "切换到中文" : "Switch to English"; }
+        void UpdateLanguageButton()
+        {
+            langText.Text = Lang.English ? "中" : "EN";
+            langButton.ToolTip = LanguageSwitchText();
+            AutomationProperties.SetName(langButton, LanguageSwitchText());
+            moreButton.ToolTip = Lang.T("更多选项", "More options");
+            AutomationProperties.SetName(moreButton, Lang.T("更多选项", "More options"));
+        }
         void ToggleLanguage() { SetLanguage(Lang.English ? "zh" : "en"); }
         // Saved, then every visible string is rebuilt in place — no restart needed.
         void SetLanguage(string language)
         {
             saved.language = language; Lang.Apply(language); SaveState();
-            capsule.ContextMenu = BuildMenu();
+            menu.IsOpen = false;
+            menu = BuildMenu();
+            UpdateLanguageButton();
             var oldTray = tray.ContextMenuStrip;
             tray.Text = Lang.T("Agent HUD · 额度小组件", "Agent HUD · quota widget");
             tray.ContextMenuStrip = BuildTrayMenu();
@@ -318,7 +363,7 @@ namespace AgentHud
             pinShape.Stroke = brush; pinShape.Fill = saved.pinned ? brush : Brushes.Transparent;
             pinSlash.Stroke = brush; pinSlash.Visibility = saved.pinned ? Visibility.Collapsed : Visibility.Visible;
             var action = saved.pinned ? Lang.T("已置顶 · 点击取消置顶", "Pinned · click to unpin") : Lang.T("未置顶 · 点击置顶", "Not pinned · click to pin");
-            pinButton.ToolTip = action + Lang.T("\n右键打开更多选项", "\nRight-click for more options");
+            pinButton.ToolTip = action;
             AutomationProperties.SetName(pinButton, saved.pinned ? Lang.T("已置顶，点击取消置顶", "Pinned, click to unpin") : Lang.T("未置顶，点击置顶", "Not pinned, click to pin"));
         }
         async Task Fetch()
@@ -368,7 +413,7 @@ namespace AgentHud
             var wasDegraded = degraded;
             degraded = !online;
             if (degraded != wasDegraded) rim.BorderBrush = degraded ? palette.RimOffline : palette.Rim;
-            var detail = Lang.T("拖动可移动 · 靠近屏幕边缘自动贴边 · 右键打开菜单\n", "Drag to move · snaps to screen edges · right-click for the menu\n")
+            var detail = Lang.T("拖动可移动 · 靠近屏幕边缘自动贴边 · ⋯ 打开菜单\n", "Drag to move · snaps to screen edges · ⋯ opens the menu\n")
                 + (!online ? Lang.T("本地服务离线，正在自动重启；显示的是最后一次快照", "Local service offline, restarting automatically; showing the last snapshot")
                     : snapshot.loading ? Lang.T("正在读取额度", "Reading quotas")
                     : scanStale ? Lang.T("会话扫描延迟，额度不受影响", "Session scan delayed; quotas are unaffected")
