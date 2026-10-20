@@ -1,90 +1,98 @@
 # Agent HUD
 
-Codex + Claude Code 的本地用量面板。零 npm 依赖，Node.js 22+。
+English | [简体中文](README.zh-CN.md)
 
-## 启动
+A local usage dashboard and Windows desktop widget for Codex and Claude Code. No npm dependencies; Node.js 22+.
 
-Windows：右键 `start.ps1`，选择用 PowerShell 运行；或在项目目录运行 `powershell -ExecutionPolicy Bypass -File .\start.ps1`。启动器在后台启动服务并打开浏览器。用 `stop.ps1` 停止启动器创建的服务。
+## Quick start
 
-也可以在终端运行 `node server.mjs`，打开 http://127.0.0.1:4318，按 Ctrl+C 停止。设置环境变量 `PORT` 可更换端口。界面右上角可打开紧凑窗口，浏览器是否置顶由系统/浏览器决定；也可切换外观（跟随系统 / 浅色 / 深色）。
+You need Windows 10/11, Node.js 22+ (24.5+ recommended on Windows), and Codex and/or Claude Code used on this machine.
 
-## 数据与计数
+**Dashboard:** right-click `start.ps1` and choose *Run with PowerShell*, or run `powershell -ExecutionPolicy Bypass -File .\start.ps1` in the project folder. It starts the service in the background and opens your browser; `stop.ps1` stops the service it started. You can also run `node server.mjs` directly, open http://127.0.0.1:4318, and press Ctrl+C to stop. Set the `PORT` environment variable to use another port.
 
-- Codex：增量读取 `~/.codex/sessions/**/*.jsonl`，从 `session_index.jsonl` 读取标题。优先使用 `token_usage_record` 的请求用量，老版本退回 `token_count` 累计值差分。按 response ID 去重，排除其他 thread 的继承记录，识别父子 agent。
-- Claude Code：增量读取 `~/.claude/projects/**/*.jsonl`。按 message ID 合并同一响应的流式记录，跨复制/续接会话去重，读取子 agent 文件。
-- 输入包含缓存读取和写入；输出包含推理。缓存和推理不能再次加到合计中。跨平台统一口径为 `input + output`。
-- 默认隐藏系统审查 agent；可在表格下方开启。系统审查 token 记录不等于订阅额度消耗。
-- 统计范围包含本机尚未归档的会话。不是全部云端活动，不是账单。显示的“最近活跃”基于 2 分钟内的记录，不是进程检测。
-- 日期范围和图表采用 America/New_York 时区。账户额度始终是平台自身的窗口，不受 token 统计日期筛选影响。
+**Desktop widget:** build it with `powershell -ExecutionPolicy Bypass -File desktop/build.ps1`, then launch `desktop\bin\AgentHUD.exe` (you can pin a shortcut to it on the desktop or taskbar). The widget starts the local service by itself, so you don't need to run `start.ps1` first.
 
-## Codex 账户额度
+The dashboard's top-right corner opens a compact window (whether it stays on top is up to your OS/browser) and switches appearance (system / light / dark).
 
-通过官方 App Server 的只读 `account/rateLimits/read` 每分钟刷新，不发起模型请求。复用 Codex 自身的登录流程；应用不读取、存储或输出登录密钥。连接失败时显示最近会话里的真实额度快照，并标注来源和时间。超过重置时间显示等待更新，不推断为 100%。
+## Data and counting
 
-可设置 `CODEX_BINARY` 指向 Codex 可执行文件，`CODEX_HOME` 指定会话目录。`AGENT_HUD_DISABLE_RPC=1` 可仅使用本地快照。
+- Codex: incrementally reads `~/.codex/sessions/**/*.jsonl` and takes titles from `session_index.jsonl`. Uses per-request `token_usage_record` usage when present, falling back to diffs of cumulative `token_count` values on older versions. Deduplicates by response ID, excludes records inherited from other threads, and recognizes parent/child agents.
+- Claude Code: incrementally reads `~/.claude/projects/**/*.jsonl`. Merges streamed records of the same response by message ID, deduplicates across copied/resumed sessions, and reads sub-agent files.
+- Input includes cache reads and writes; output includes reasoning. Cache and reasoning are never added to the total a second time. The cross-platform total is `input + output`.
+- System review agents are hidden by default; turn them on below the table. Their token records do not equal subscription quota usage.
+- Counts cover sessions on this machine that haven't been archived. It is not all of your cloud activity and not a bill. "Recently active" means a record in the last 2 minutes, not process detection.
+- Date ranges and charts use the America/New_York time zone. Account quotas always follow each platform's own windows and ignore the token date filter.
 
-参考：[Codex 官方 App Server 文档](https://learn.chatgpt.com/docs/app-server)。
+## Codex account quota
 
-## Windows 桌面小组件
+Refreshed every minute through the official App Server's read-only `account/rateLimits/read`, without making model requests. It reuses Codex's own sign-in; the app never reads, stores or prints login secrets. When the connection fails it shows the real quota snapshot from your latest session, labelled with its source and time. Past the reset time it shows "waiting for update" instead of assuming 100%.
 
-双击桌面或任务栏上的 **Agent HUD 桌面版**。此快捷方式直接启动 `desktop/bin/AgentHUD.exe`，程序启动后会自动恢复本地额度服务。2026-10-19 已修复旧入口失效问题：Norton 拦截了原来的 `Agent HUD.vbs` 和 `start-widget.ps1`，当前入口不依赖这两个文件，也未恢复被拦截的脚本。
+Set `CODEX_BINARY` to point at the Codex executable and `CODEX_HOME` to choose the sessions folder. `AGENT_HUD_DISABLE_RPC=1` uses local snapshots only.
 
-小组件是 260 × 48 DIP 的毛玻璃横条：实时模糊背后的内容，使用 Windows 11 原生圆角，随 Windows 显示缩放调整，接近默认任务栏高度，并跟随 Windows 应用的浅色/深色主题（与完整面板一致）。系统关闭“透明效果”时改用不透明底色。圆环使用两家的品牌色（Codex 蓝紫渐变、Claude 陶土橙），中心是各自的标志，旁边显示剩余百分比；低于 20% 时百分比变红。标志图形来自 [LobeHub Icons](https://github.com/lobehub/lobe-icons)（MIT），商标归 OpenAI 与 Anthropic 所有。
+Reference: [Codex App Server documentation](https://learn.chatgpt.com/docs/app-server).
 
-按住空白处拖动可移动，松手时靠近屏幕工作区边缘会贴边，并自动保存显示器及相对位置。恢复位置会避开任务栏和多屏之间的空隙；显示器或缩放变化后重新校正，找不到原屏幕时回到主屏。右键菜单和托盘菜单均提供“重置小组件位置”。
+## Windows desktop widget
 
-右侧 `5h` / `7d` 切换额度周期。百分比下方显示额度重置时间：一天内显示具体时刻（如“14:30 重置”），更远时显示星期（如“周四重置”，跨到下周同一天为“下周四重置”）；离线时此处显示“离线”，平台未提供重置时间时显示平台名。悬停圆环可查看额度的实际采集时间、多久前更新、重置倒计时、完整日期与来源。本地快照每 5 秒读取一次，Codex 官方额度正常约每分钟查询、Claude 桌面额度正常约每 5 分钟查询，连接失败时可能延迟。未知时间不会显示成“刚刚”。蓝色实心图钉表示已置顶，带斜线的空心图钉表示未置顶；点一下图钉即切换置顶，再点一下取消。右键小组件打开菜单，可切换置顶、打开面板或官方用量页、收起至托盘或退出。
+The widget runs `desktop/bin/AgentHUD.exe` directly and brings the local quota service back on its own. Earlier versions launched through `Agent HUD.vbs` and `start-widget.ps1`, which antivirus software (Norton) quarantined, so the entry point no longer depends on scripts. On the first run of a freshly built exe, some antivirus products hold it for tens of seconds while scanning.
 
-本地服务离线时边缘变橙并显示“离线”，小组件在连续两次读取失败后自动用 `start.ps1` 重启服务（最多每分钟一次）。值和显示状态未变化时不重复重绘圆环；收起后停止界面更新和动画，继续获取数据，恢复时立即显示最新快照。托盘与退出信号由事件唤醒，不再每秒轮询。
+The widget is a 260 × 48 DIP frosted-glass strip: it blurs whatever is behind it live, uses Windows 11's native rounded corners, scales with Windows display scaling to roughly taskbar height, and follows the Windows app light/dark theme (matching the dashboard). With Windows transparency effects off it switches to an opaque background. The rings use each brand's colors (Codex's blue-violet gradient, Claude's clay orange) with the brand's mark in the center and the remaining percentage beside it; the percentage turns red below 20%.
 
-界面视觉遵循 [apple-design-skill](https://github.com/naplesblue/apple-design-skill) 的规范：灰白底、白色面板与发丝分隔线、灰阶层级加单一蓝色强调，玻璃只用于导航、弹窗和悬浮的小组件。
+Drag empty space to move it. On release it snaps to the edge of the screen's work area when close, and it remembers the monitor and relative position. Restored positions avoid the taskbar and gaps between monitors, are corrected after display or scaling changes, and fall back to the primary screen if the original one is gone. Both the right-click menu and the tray menu offer *Reset widget position*.
 
-桌面程序使用 Windows 自带 .NET Framework 构建，不需要安装额外桌面运行时。当前任务栏直接启动入口复用现有程序，不执行源码检查和自动重编译。修改源码后，请先从小组件菜单退出，再运行 `powershell -ExecutionPolicy Bypass -File desktop/build.ps1`，然后点击快捷方式重新启动。`desktop/build-support.ps1` 中的内容指纹、临时目录构建与有序替换逻辑仍保留，供开发和回归测试使用。当前启动诊断记录在 `.data/widget-startup.log`，程序错误记录在 `.data/widget-error.log`。
+`5h` / `7d` on the right switches the quota window. Under each percentage is the quota's reset time: the clock time when it's within a day (e.g. "14:30 重置"), otherwise the weekday (e.g. "周四重置", or "下周四重置" when it falls on the same weekday next week). It reads "离线" (offline) when the service is offline, and the platform name when the platform gives no reset time. Hover a ring for when the quota was actually collected, how long ago that was, the reset countdown, the full date, and the source. Local snapshots are read every 5 seconds; Codex's official quota is normally queried about once a minute and Claude's desktop quota about every 5 minutes, and both may lag when connections fail. An unknown time is never shown as "just now".
 
-## Claude 账户额度
+A solid blue pin means always-on-top; a hollow pin with a slash means not pinned. Click the pin once to pin, again to unpin. Right-click the widget for the menu: toggle always-on-top, open the dashboard or the Codex / Claude usage pages, hide to the tray, or quit.
 
-### Windows 桌面账户连接
+When the local service is offline the edge turns orange and the widget shows "离线"; after two failed reads in a row it restarts the service with `start.ps1` (at most once a minute). Rings aren't redrawn when nothing changed; when hidden, the widget stops UI updates and animation but keeps fetching, and shows the latest snapshot as soon as it's restored. Tray and exit signals are event-driven rather than polled every second.
 
-新增了桌面版账户读取通道，默认关闭。它仅在内存中读取当前 Windows 用户的 Claude 加密 OAuth 缓存，匹配当前账户和唯一组织，并向固定地址 `https://api.anthropic.com/api/oauth/usage` 发送 GET。此额度由同一账户的桌面版、网页版和 CLI 共享，不依赖状态栏回调，也不发起模型请求。
+The visual design follows [apple-design-skill](https://github.com/naplesblue/apple-design-skill): a grey-white ground, white panels with hairline dividers, grayscale hierarchy with a single blue accent, and glass only on navigation, dialogs and the floating widget.
 
-明确允许此连接后，运行 `node scripts/connect-claude-desktop.mjs --enable`，然后重启 HUD 服务。关闭连接使用同一命令的 `--disable`。开关保存在本项目 `.data/claude-desktop-connection.json`，默认缺失时不会读取任何登录凭据或请求 Claude 额度。
+The desktop app builds with the .NET Framework that ships with Windows, so no extra runtime is needed. The launcher reuses the existing build and doesn't check sources or recompile. After changing the source, quit the widget from its menu, run `powershell -ExecutionPolicy Bypass -File desktop/build.ps1`, then start it again. The content fingerprinting, staging builds and ordered replacement in `desktop/build-support.ps1` remain for development and regression tests. Startup diagnostics go to `.data/widget-startup.log` and errors to `.data/widget-error.log`.
 
-正常每 5 分钟查询，限流时至少等待 15 分钟。HUD 不保存访问令牌、不记录接口原始响应、不修改 Claude 配置、不刷新或轮换令牌；连接过期时需打开 Claude，由原应用续期。多组织无法确定归属时停止读取，防止显示错账户的额度。断线时标注历史快照，注销或账户连接失效时清空旧值。
+## Claude account quota
 
-兼容 Windows 独立安装与 Microsoft Store 的 Claude 数据目录。依据本机桌面应用的内部接口实现，并非厂商公开承诺稳定的第三方 API，应用更新后可能需要适配。已在用户明确授权后，验证本机 Microsoft Store 桌面版的真实账户请求，成功取得 5 小时和 7 天额度及重置时间。
+### Windows desktop account connection
 
-Windows 上建议使用 Node.js 24.5+；HUD 会同时使用 Node 默认证书和 Windows 系统可信证书库，保持完整 HTTPS 校验。
+The desktop account channel is off by default. It reads the current Windows user's encrypted Claude OAuth cache in memory only, matches the current account and its single organization, and sends a GET to the fixed address `https://api.anthropic.com/api/oauth/usage`. This quota is shared by the desktop app, web and CLI of the same account; it doesn't depend on status-line callbacks and makes no model requests.
 
-### 终端状态栏桥接
+Once you explicitly allow the connection, run `node scripts/connect-claude-desktop.mjs --enable` and restart the HUD service. Turn it off with `--disable` on the same command. The switch is stored in this project's `.data/claude-desktop-connection.json`; while it's absent, no credentials are read and no Claude quota is requested.
 
-运行 `node scripts/connect-claude.mjs` 接入官方状态栏。脚本备份 `~/.claude/settings.json` 后只添加 `statusLine`；已存在其他自定义状态栏时会停止，避免覆盖。可使用 `CLAUDE_CONFIG_DIR` 指向其他 Claude 配置目录。
+It normally queries every 5 minutes and waits at least 15 minutes when rate limited. HUD doesn't store access tokens, log raw responses, change Claude's configuration, or refresh or rotate tokens; when the connection expires, open Claude so the app renews it. If the organization can't be determined among several, it stops reading rather than show another account's quota. Offline values are marked as snapshots, and old values are cleared on sign-out or when the account connection becomes invalid.
 
-此桥接适用于**终端中的 Claude Code CLI**。重新打开 CLI 后，正常模型响应会触发状态栏，HUD 读取其中的平台额度。无需为 HUD 额外发送请求。字段是否出现取决于 Claude Code 版本和账户类型；未提供时保留未知状态，不根据 token 推算。
+Works with both the standalone and Microsoft Store Claude data folders on Windows. It relies on the desktop app's internal interface, not a third-party API the vendor promises to keep stable, so app updates may require adjustments. Verified with a real account on the Microsoft Store desktop app: it returns the 5-hour and 7-day quotas and their reset times.
 
-终端桥接不会被本机的 Claude 桌面会话调用，安装它本身不代表桌面额度已接入。桌面版应使用上述账户连接。HUD 保留 [Claude 官方用量页](https://claude.ai/settings/usage) 入口，桌面版会话的 token 记录也仍可统计。
+Node.js 24.5+ is recommended on Windows; HUD uses both Node's default certificates and the Windows trusted certificate store, keeping full HTTPS validation.
 
-状态栏桥接仅把 session ID、额度窗口、上下文数值、采集时间写入本项目 `.data`。它不会保存完整 stdin、提示词或凭据。卸载桥接：`node scripts/connect-claude.mjs --remove`，保留其他配置不变。
+### Terminal status-line bridge
 
-已有状态栏时，可在自己的状态栏脚本中把同一份 stdin JSON 传给 `scripts/claude-statusline.mjs`，忽略其 stdout，以保留原显示。
+Run `node scripts/connect-claude.mjs` to hook into the official status line. The script backs up `~/.claude/settings.json` and only adds `statusLine`; if you already have a custom status line it stops instead of overwriting it. Use `CLAUDE_CONFIG_DIR` to point at another Claude config folder.
 
-参考：[Claude Code 官方状态栏文档](https://code.claude.com/docs/en/statusline)。
+This bridge is for the **Claude Code CLI in a terminal**. After you reopen the CLI, ordinary model responses trigger the status line and HUD reads the platform quota from it, with no extra requests made for HUD. Whether the fields appear depends on your Claude Code version and account type; when they're missing the state stays unknown rather than being estimated from tokens.
 
-## 隐私与实现
+The terminal bridge is never invoked by Claude desktop sessions on this machine, so installing it doesn't connect the desktop quota; use the account connection above for that. HUD keeps a link to the [Claude usage page](https://claude.ai/settings/usage), and token records from desktop sessions are still counted.
 
-服务仅绑定 127.0.0.1，拒绝跨域和陌生 Host。浏览器接收会话标题、项目短名称、模型和用量，不包含原始对话、工具输出、文件路径或登录信息。解析时仅保留计数和元数据；会话文件只读。`.data` 已加入 Git 忽略。
+The bridge only writes the session ID, quota windows, context values and collection time into this project's `.data`. It never stores the full stdin, prompts or credentials. To uninstall: `node scripts/connect-claude.mjs --remove`, which leaves the rest of your configuration untouched.
 
-前端每 5 秒获取快照；后台增量扫描新增日志，容忍半行 JSON。Codex 官方额度约每分钟查询，Claude 桌面额度正常约每 5 分钟查询。数据缺失、陈旧、断连都有独立状态。
+If you already have a status line, pipe the same stdin JSON to `scripts/claude-statusline.mjs` from your own status-line script and ignore its stdout to keep your existing display.
 
-其他平台可通过 `lib/collector.mjs` 增加适配器，复用 `lib/metrics.mjs` 中的统一会话/请求/额度结构。目前真正接入的只有 Codex 与 Claude Code，不展示模拟平台。
+Reference: [Claude Code status line documentation](https://code.claude.com/docs/en/statusline).
 
-## 验证
+## Privacy and implementation
 
-`npm test` 或 `node --test test/*.test.mjs`。测试包含缓存口径、推理不重复、流式响应去重、继承记录排除、空额度、重置时间与增量读取。
+The service binds to 127.0.0.1 only and rejects cross-origin requests and unknown hosts. The browser receives session titles, short project names, models and usage — never raw conversations, tool output, file paths or login information. Parsing keeps only counts and metadata, and session files are opened read-only. `.data` is git-ignored.
 
-Windows 桌面回归：`powershell -ExecutionPolicy Bypass -File desktop/test.ps1`。测试会短暂显示独立测试窗口，在 `.data/desktop-tests` 下使用独立状态，不修改实际小组件的位置与设置。覆盖置顶恢复、不抢焦点、托盘显示与退出信号、更新时间、屏幕空隙/负坐标/断屏/缩放后的定位计算、真实窗口越界校正、隐藏停止渲染及未变化的圆环不重绘。真实多屏热插拔和不同显示器 DPI 间的拖动仍需在相应硬件上验收。
+The frontend fetches a snapshot every 5 seconds; the backend incrementally scans new log lines and tolerates half-written JSON. Codex's official quota is queried about once a minute and Claude's desktop quota normally about every 5 minutes. Missing, stale and disconnected data each have their own state.
 
-自动更新回归：`powershell -ExecutionPolicy Bypass -File desktop/test-launcher.ps1`，使用临时项目与后台测试进程，覆盖首次构建、跳过未变化的源码、时间戳不变时的内容检测、有序替换、编译失败保留旧进程与旧程序；兼容桌面快捷方式使用的 Windows PowerShell 5.1。
+Other platforms can be added as adapters in `lib/collector.mjs`, reusing the common session / request / quota structures in `lib/metrics.mjs`. Only Codex and Claude Code are actually connected today; no simulated platforms are shown.
 
-## 许可
+## Tests
 
-本项目以 MIT 许可发布，见 [LICENSE](LICENSE)。小组件与面板中的 Codex、Claude 标志图形来自 [LobeHub Icons](https://github.com/lobehub/lobe-icons)（MIT）；这些标志是 OpenAI 与 Anthropic 的商标，不随本项目的 MIT 许可授予。
+`npm test` or `node --test test/*.test.mjs`. Covers cache accounting, reasoning not double-counted, streamed-response deduplication, inherited-record exclusion, empty quotas, reset times and incremental reads.
+
+Windows desktop regression: `powershell -ExecutionPolicy Bypass -File desktop/test.ps1`. It briefly shows separate test windows and uses its own state under `.data/desktop-tests`, without touching your real widget's position or settings. Covers always-on-top recovery, pin-click toggling, not stealing focus, tray show and exit signals, update and reset-time display, positioning across monitor gaps / negative coordinates / unplugged screens / scaling, correcting real out-of-bounds windows, no rendering while hidden, and no redraw of unchanged rings. Real multi-monitor hot-plugging and dragging between monitors with different DPI still need checking on matching hardware.
+
+Update regression: `powershell -ExecutionPolicy Bypass -File desktop/test-launcher.ps1`, using a temporary project and background test processes. Covers first build, skipping unchanged sources, content checks when timestamps don't change, ordered replacement, and keeping the old process and binary when compilation fails; compatible with Windows PowerShell 5.1.
+
+## License
+
+Released under the MIT License — see [LICENSE](LICENSE). The Codex and Claude marks in the widget and dashboard come from [LobeHub Icons](https://github.com/lobehub/lobe-icons) (MIT); they are trademarks of OpenAI and Anthropic and are not licensed under this project's MIT License.
