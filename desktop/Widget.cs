@@ -116,7 +116,7 @@ namespace AgentHud
             ReadState();
             Lang.Apply(saved.language);
             Title = "Agent HUD Widget";
-            Width = 300; Height = 48;
+            Width = 304; Height = 48;
             WindowStyle = WindowStyle.None; ResizeMode = ResizeMode.NoResize;
             // Not a layered window: DWM only honours the capsule region for the blur on regular windows.
             // The glass frame spans the whole client area so transparent pixels show the blurred backdrop.
@@ -217,7 +217,8 @@ namespace AgentHud
             capsule.Children.Add(tint); capsule.Children.Add(sheen); capsule.Children.Add(edge); capsule.Children.Add(rim);
             var body = new Grid();
             // Language · pin · period · more: each button gets the strip's full height as hit area (the visible chip stays small).
-            foreach (var width in new[] { 7.0, 34, 5, 52, 5, 34, 5, 52, -1, 24, 22, 40, 18, 2 })
+            // The trailing 6 keeps the dots about as far from the right edge as the first ring is from the left.
+            foreach (var width in new[] { 7.0, 34, 5, 52, 5, 34, 5, 52, -1, 24, 22, 40, 18, 6 })
                 body.ColumnDefinitions.Add(new ColumnDefinition { Width = width < 0 ? new GridLength(1, GridUnitType.Star) : new GridLength(width) });
             capsule.Children.Add(body);
             codex.VerticalAlignment = VerticalAlignment.Center; Grid.SetColumn(codex, 1); body.Children.Add(codex);

@@ -20,7 +20,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/images/widget-en.png" width="675" alt="Desktop widget: Codex and Claude quota rings with their logos, remaining percentage and reset time">
+  <img src="docs/images/widget-en.png" width="680" alt="Desktop widget: Codex and Claude quota rings with their logos, remaining percentage and reset time">
 </p>
 
 <p align="center">
@@ -71,7 +71,7 @@ Reference: [Codex App Server documentation](https://learn.chatgpt.com/docs/app-s
 
 The widget runs `desktop/bin/AgentHUD.exe` directly and brings the local quota service back on its own. Earlier versions launched through `Agent HUD.vbs` and `start-widget.ps1`, which antivirus software (Norton) quarantined, so the entry point no longer depends on scripts. On the first run of a freshly built exe, some antivirus products hold it for tens of seconds while scanning.
 
-The widget is a 300 × 48 DIP frosted-glass strip: it blurs whatever is behind it live, uses Windows 11's native rounded corners, scales with Windows display scaling to roughly taskbar height, and follows the Windows app light/dark theme (matching the dashboard). With Windows transparency effects off it switches to an opaque background. The rings use each brand's colors (Codex's blue-violet gradient, Claude's clay orange) with the brand's mark in the center and the remaining percentage beside it; the percentage turns red below 20%.
+The widget is a 304 × 48 DIP frosted-glass strip: it blurs whatever is behind it live, uses Windows 11's native rounded corners, scales with Windows display scaling to roughly taskbar height, and follows the Windows app light/dark theme (matching the dashboard). With Windows transparency effects off it switches to an opaque background. The rings use each brand's colors (Codex's blue-violet gradient, Claude's clay orange) with the brand's mark in the center and the remaining percentage beside it; the percentage turns red below 20%.
 
 Drag empty space to move it. On release it snaps to the edge of the screen's work area when close, and it remembers the monitor and relative position. Restored positions avoid the taskbar and gaps between monitors, are corrected after display or scaling changes, and fall back to the primary screen if the original one is gone. Both the ⋯ menu and the tray menu offer *Reset widget position*.
 
