@@ -1,0 +1,14 @@
+{
+  "name": "agent-hud",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Local usage and quota monitor for Codex and Claude Code",
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node --test test/*.test.mjs",
+    "claude:connect": "node scripts/connect-claude.mjs",
+    "claude:disconnect": "node scripts/connect-claude.mjs --remove"
+  },
+  "engines": { "node": ">=22" }
+}
