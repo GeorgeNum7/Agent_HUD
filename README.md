@@ -25,11 +25,11 @@
 
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/images/dashboard-dark.png">
-    <img src="docs/images/dashboard-light.png" width="880" alt="Dashboard: account quotas, usage summary and a seven-day usage chart">
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/dashboard-dark-en.png">
+    <img src="docs/images/dashboard-light-en.png" width="880" alt="Dashboard: account quotas, usage summary and a seven-day usage chart">
   </picture>
   <br>
-  <sub>Screenshots use demo data. The dashboard interface is in Chinese; the widget speaks English and Chinese.</sub>
+  <sub>Screenshots use demo data.</sub>
 </p>
 
 ## Highlights
@@ -38,7 +38,7 @@
 - 📊 **Dashboard** — account quotas, token usage, cache hit rate, a seven-day chart and every agent session, in light or dark.
 - 🔒 **Local only** — reads your own Codex / Claude Code logs, binds to 127.0.0.1, never stores prompts or credentials.
 - 📌 **Stays out of the way** — one-click pin, snaps to screen edges, restarts its own service if it stops.
-- 🌐 **English / 中文** — the widget follows your Windows language, switchable from its menu.
+- 🌐 **English / 中文** — the dashboard follows your browser language and the widget your Windows language; both switch with one click.
 
 ## Quick start
 
@@ -48,7 +48,7 @@ You need Windows 10/11, Node.js 22+ (24.5+ recommended on Windows), and Codex an
 
 **Desktop widget:** build it with `powershell -ExecutionPolicy Bypass -File desktop/build.ps1`, then launch `desktop\bin\AgentHUD.exe` (you can pin a shortcut to it on the desktop or taskbar). The widget starts the local service by itself, so you don't need to run `start.ps1` first.
 
-The dashboard's top-right corner opens a compact window (whether it stays on top is up to your OS/browser) and switches appearance (system / light / dark).
+The dashboard's top-right corner switches language (EN / 中), switches appearance (system / light / dark) and opens a compact window (whether it stays on top is up to your OS/browser). The language follows your browser until you pick one, and the choice is saved; status text sent by the local service is translated too.
 
 ## Data and counting
 

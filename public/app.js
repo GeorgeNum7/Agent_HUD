@@ -1,13 +1,14 @@
+import { t, lang, setLang, server, rangeLabel, locale, applyStatic } from '/i18n.js';
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
 const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const compact = new URLSearchParams(location.search).has('compact');
 if (compact) document.body.classList.add('compact');
-const state = { data: null, range: '7d', provider: 'all', query: '', view: 'overview', includeSystem: false, sort: 'recent', rows: [], online: false, loading: false, detailId: null };
+// online: null until the first fetch settles, so the nav can say "connecting" rather than "disconnected".
+const state = { data: null, range: '7d', provider: 'all', query: '', view: 'overview', includeSystem: false, sort: 'recent', rows: [], online: null, loading: false, detailId: null };
 const number = n => new Intl.NumberFormat('en-US', { notation: n >= 10000 ? 'compact' : 'standard', maximumFractionDigits: 1 }).format(n);
 const exact = n => new Intl.NumberFormat('en-US').format(Math.round(n || 0));
 const percent = n => `${Number(n.toFixed(1))}%`;
-const rangeLabels = { today: '今天', '7d': '最近 7 天', '30d': '最近 30 天', all: '全部记录' };
 const USAGE_PAGES = { codex: 'https://chatgpt.com/codex/settings/usage', claude: 'https://claude.ai/settings/usage' };
 // Platform marks on a 24×24 grid, from LobeHub icons (MIT); the marks are trademarks of OpenAI and Anthropic.
 // Codex uses its brand gradient (#codex-brand in index.html), Claude its clay colour. Same paths as desktop/Logos.cs.
@@ -20,9 +21,9 @@ const dayCache = new Map();
 function calendarDay(time) { if(dayCache.has(time))return dayCache.get(time); const parts = dayFormatter.formatToParts(time); const day = ['year','month','day'].map(type => parts.find(p => p.type === type).value).join('-'); if(dayCache.size>100000)dayCache.clear(); dayCache.set(time,day); return day; }
 function offsetDay(key, days) { const d = new Date(`${key}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + days); return d.toISOString().slice(0,10); }
 function sinceDay() { const today = calendarDay(Date.now()); return state.range === 'all' ? '0000-00-00' : offsetDay(today, -(state.range === 'today' ? 0 : state.range === '7d' ? 6 : 29)); }
-function ago(time) { if (!time) return '未提供'; const seconds = Math.max(0, Math.floor((Date.now() - time)/1000)); if (seconds < 60) return '刚刚'; if (seconds < 3600) return `${Math.floor(seconds/60)} 分钟前`; if (seconds < 86400) return `${Math.floor(seconds/3600)} 小时前`; return `${Math.floor(seconds/86400)} 天前`; }
-function fullTime(time) { return time ? new Intl.DateTimeFormat('zh-CN', { timeZone: state.data?.timeZone || 'America/New_York', dateStyle: 'short', timeStyle: 'short' }).format(time) : '未提供'; }
-function countdown(time) { if (!time) return '重置时间未提供'; const mins = Math.ceil((time - Date.now())/60000); if (mins <= 0) return '重置时间已过 · 等待更新'; if (mins >= 1440) return `${Math.floor(mins/1440)} 天 ${Math.floor(mins%1440/60)} 小时后重置`; return `${Math.floor(mins/60)} 小时 ${mins%60} 分钟后重置`; }
+function ago(time) { if (!time) return t('time.none'); const seconds = Math.max(0, Math.floor((Date.now() - time)/1000)); if (seconds < 60) return t('time.justNow'); if (seconds < 3600) return t('time.min', { n: Math.floor(seconds/60) }); if (seconds < 86400) return t('time.hour', { n: Math.floor(seconds/3600) }); return t('time.day', { n: Math.floor(seconds/86400) }); }
+function fullTime(time) { return time ? new Intl.DateTimeFormat(locale(), { timeZone: state.data?.timeZone || 'America/New_York', dateStyle: 'short', timeStyle: 'short' }).format(time) : t('time.none'); }
+function countdown(time) { if (!time) return t('reset.none'); const mins = Math.ceil((time - Date.now())/60000); if (mins <= 0) return t('reset.passed'); if (mins >= 1440) return t('reset.days', { d: Math.floor(mins/1440), h: Math.floor(mins%1440/60) }); if (mins < 60) return t('reset.minutes', { m: mins }); return t('reset.hours', { h: Math.floor(mins/60), m: mins%60 }); }
 function usage(records) { return records.reduce((sum,r) => { for (const k of Object.keys(sum)) sum[k] += r[k] || 0; return sum; }, { input:0, output:0, cached:0, cacheWrite:0, reasoning:0, total:0 }); }
 function selectedSessions() {
   if (!state.data) return [];
@@ -41,12 +42,12 @@ function renderProviders() {
     const windows = limits?.windows || [];
     const recent = limits && !limits.stale && Date.now() - limits.collectedAt < (limits.staleAfterMs || 120000);
     const plan = limits?.plan ? `<span class="plan">${escapeHtml(limits.plan)}</span>` : '';
-    const label = windows.length ? (recent ? '已同步' : '历史快照') : (p.connected ? '用量已接入' : '等待接入');
+    const label = windows.length ? (recent ? t('state.synced') : t('state.snapshot')) : (p.connected ? t('state.connected') : t('state.waiting'));
     const body = windows.length ? `<div class="quota-windows">${windows.map(win => {
       const expired = win.resetsAt && win.resetsAt <= Date.now();
-      return `<div class="quota-window"><div class="quota-label"><span>${escapeHtml(win.name)}</span><small>${expired ? '等待更新' : '剩余'}</small></div><div class="quota-number">${expired ? '—' : Number(win.remainingPercent.toFixed(1))}${expired ? '' : '<small>%</small>'}</div><div class="quota-bar ${win.remainingPercent < 20 ? 'low' : ''}"><span style="width:${expired ? 0 : win.remainingPercent}%"></span></div><div class="quota-reset" title="${escapeHtml(fullTime(win.resetsAt))}">${countdown(win.resetsAt)}</div></div>`;
-    }).join('')}</div>` : `<div class="unavailable"><strong>额度尚未提供</strong><p>${escapeHtml(id === 'claude' ? p.quotaMessage || '尚未收到 Claude Code CLI 状态栏数据。' : '等待 Codex 返回账户额度数据。')}</p>${id === 'claude' ? `<div class="button-row"><a class="connect-button" href="https://claude.ai/settings/usage" target="_blank" rel="noreferrer">查看 Claude 官方用量 ↗</a><button class="connect-button secondary" data-setup>终端版接入说明</button></div>` : ''}</div>`;
-    return `<article class="provider-card ${id}"><div class="provider-top"><span class="provider-logo ${id}" aria-hidden="true">${LOGOS[id]}</span><span class="provider-name">${p.name}</span>${plan}<span class="provider-state"><i class="${recent ? 'live' : ''}"></i>${label}</span></div>${body}<div class="provider-foot"><span title="${escapeHtml(p.quotaError || '')}">${limits ? `${escapeHtml(limits.source)} · ${ago(limits.collectedAt)}` : '会话用量与账户额度分别统计'}</span><div class="foot-links"><a class="source-link" href="${USAGE_PAGES[id]}" target="_blank" rel="noreferrer">官方用量 ↗</a><button class="source-link" data-connections>数据来源</button></div></div></article>`;
+      return `<div class="quota-window"><div class="quota-label"><span>${escapeHtml(server(win.name))}</span><small>${expired ? t('quota.updating') : t('quota.left')}</small></div><div class="quota-number">${expired ? '—' : Number(win.remainingPercent.toFixed(1))}${expired ? '' : '<small>%</small>'}</div><div class="quota-bar ${win.remainingPercent < 20 ? 'low' : ''}"><span style="width:${expired ? 0 : win.remainingPercent}%"></span></div><div class="quota-reset" title="${escapeHtml(fullTime(win.resetsAt))}">${countdown(win.resetsAt)}</div></div>`;
+    }).join('')}</div>` : `<div class="unavailable"><strong>${t('quota.unavailable')}</strong><p>${escapeHtml(id === 'claude' ? server(p.quotaMessage) || t('quota.claudeMissing') : t('quota.codexMissing'))}</p>${id === 'claude' ? `<div class="button-row"><a class="connect-button" href="https://claude.ai/settings/usage" target="_blank" rel="noreferrer">${t('quota.claudeUsage')}</a><button class="connect-button secondary" data-setup>${t('quota.setupGuide')}</button></div>` : ''}</div>`;
+    return `<article class="provider-card ${id}"><div class="provider-top"><span class="provider-logo ${id}" aria-hidden="true">${LOGOS[id]}</span><span class="provider-name">${p.name}</span>${plan}<span class="provider-state"><i class="${recent ? 'live' : ''}"></i>${label}</span></div>${body}<div class="provider-foot"><span title="${escapeHtml(server(p.quotaError) || '')}">${limits ? `${escapeHtml(server(limits.source))} · ${ago(limits.collectedAt)}` : t('quota.separate')}</span><div class="foot-links"><a class="source-link" href="${USAGE_PAGES[id]}" target="_blank" rel="noreferrer">${t('quota.usagePage')}</a><button class="source-link" data-connections>${t('quota.sources')}</button></div></div></article>`;
   }).join('');
   $$('[data-setup]').forEach(b => b.addEventListener('click', openSetup));
   $$('[data-connections]').forEach(b => b.addEventListener('click', () => switchView('connections')));
@@ -57,10 +58,10 @@ function renderStats(sessions) {
   const cacheRate = totals.input ? totals.cached / totals.input * 100 : 0;
   const active = sessions.filter(s => s.activity === 'recent').length;
   const stats = [
-    ['总用量',number(totals.total),'tokens',`${rangeLabels[state.range]} · 本地已记录用量`],
-    ['输入 / 输出',`${number(totals.input)} <small>/</small> ${number(totals.output)}`,'','输入包含缓存 · 输出包含推理'],
-    ['缓存命中率',totals.input ? percent(cacheRate) : '—','',`${number(totals.cached)} tokens 来自缓存读取`],
-    ['Agent 会话',sessions.length,'',`${active} 个最近活跃 · 包含独立子 agent`],
+    [t('stat.total'),number(totals.total),'tokens',t('stat.totalNote', { range: rangeLabel(state.range) })],
+    [t('stat.io'),`${number(totals.input)} <small>/</small> ${number(totals.output)}`,'',t('stat.ioNote')],
+    [t('stat.cache'),totals.input ? percent(cacheRate) : '—','',t('stat.cacheNote', { n: number(totals.cached) })],
+    [t('stat.sessions'),sessions.length,'',t('stat.sessionsNote', { n: active })],
   ];
   $('#summary-stats').innerHTML = stats.map(([label,value,unit,note]) => `<div class="stat"><div class="stat-label">${label}</div><div class="stat-value">${value}${unit ? `<small>${unit}</small>` : ''}</div><div class="stat-note">${note}</div></div>`).join('');
   $('#nav-count').textContent = sessions.length;
@@ -85,7 +86,7 @@ function smoothPath(points) {
 }
 
 function renderChart(sessions) {
-  $('#chart-range').textContent = rangeLabels[state.range];
+  $('#chart-range').textContent = rangeLabel(state.range);
   const records = sessions.flatMap(s => s.records.map(r => ({ ...r, provider: s.provider })));
   const today = calendarDay(Date.now());
   let start = sinceDay();
@@ -112,10 +113,10 @@ function renderChart(sessions) {
     const points = buckets.map((b,i) => [x(i), y(b[id])]);
     const path = smoothPath(points);
     const area = points.length>1 ? `<path d="${path} L${x(buckets.length-1)},${height-bottom} L${x(0)},${height-bottom} Z" fill="url(#${id}-fill)"/>` : '';
-    return `${area}<path class="chart-line ${id}" d="${path}"/>${buckets.map((b,i) => `<circle class="chart-dot ${id}" cx="${x(i)}" cy="${y(b[id])}" r="${buckets.length>15 ? 2.5 : 3.5}"><title>${id==='codex'?'Codex':'Claude Code'} · ${b.day}${step>1?' 起 '+step+' 天':''} · ${exact(b[id])} tokens</title></circle>`).join('')}`;
+    return `${area}<path class="chart-line ${id}" d="${path}"/>${buckets.map((b,i) => `<circle class="chart-dot ${id}" cx="${x(i)}" cy="${y(b[id])}" r="${buckets.length>15 ? 2.5 : 3.5}"><title>${id==='codex'?'Codex':'Claude Code'} · ${b.day}${step>1?t('chart.bucket', { n: step }):''} ·${exact(b[id])} tokens</title></circle>`).join('')}`;
   }).join('');
   const fill = id => `<linearGradient id="${id}-fill" x1="0" y1="0" x2="0" y2="1"><stop class="stop ${id}" stop-opacity=".08"/><stop class="stop ${id}" offset="1" stop-opacity="0"/></linearGradient>`;
-  box.innerHTML = `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeHtml(rangeLabels[state.range])} Codex 与 Claude Code token 用量趋势"><defs>${fill('codex')}${fill('claude')}</defs>${grid}${lines}${labels}</svg>`;
+  box.innerHTML = `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeHtml(t('chart.aria', { range: rangeLabel(state.range) }))}"><defs>${fill('codex')}${fill('claude')}</defs>${grid}${lines}${labels}</svg>`;
 }
 
 function renderSessions(sessions) {
@@ -124,13 +125,13 @@ function renderSessions(sessions) {
   rows.sort(state.sort === 'tokens' ? (a,b) => b.usage.total-a.usage.total : (a,b) => b.updatedAt-a.updatedAt);
   state.rows=rows;
   $('#session-count').textContent=rows.length;
-  $('#table-note').textContent=`${rangeLabels[state.range]} · ${rows.length} 个会话 · 额度为账户共享`;
+  $('#table-note').textContent=t('table.note', { range: rangeLabel(state.range), n: rows.length });
   $('#sessions-body').innerHTML = rows.length ? rows.map(s => {
     const ctx = s.context;
     const ctxPercent = ctx && Number.isFinite(ctx.percent) ? ctx.percent : null;
     const cache = s.usage.input ? percent(s.usage.cached/s.usage.input*100) : '—';
-    return `<tr><td><div class="agent-cell"><span class="agent-symbol ${s.provider}" aria-hidden="true">${LOGOS[s.provider]||''}</span><div class="agent-title"><button data-detail="${escapeHtml(s.provider+':'+s.id)}" title="${escapeHtml(s.name)}">${escapeHtml(s.name)}</button><div class="agent-subtitle"><span>${escapeHtml(s.project)}</span>${s.kind==='subagent'?'<span class="subagent-label">↳ 子 agent</span>':''}${s.guardian?'<span class="subagent-label">系统审查</span>':''}</div></div></div></td><td><span class="model-label">${escapeHtml(s.model||'未提供')}</span></td><td class="token-cell" title="${exact(s.usage.total)} tokens">${s.records.length?number(s.usage.total):'—'}</td><td class="cache-cell">${cache}</td><td><div class="context-cell" title="最近一次上下文快照，不是账户额度">${ctxPercent==null?'未提供':`<span class="context-track"><span style="width:${ctxPercent}%"></span></span>${Math.round(ctxPercent)}%`}</div></td><td class="activity-cell ${s.activity}" title="${escapeHtml(fullTime(s.updatedAt))}">${s.activity==='recent'?'<span class="live-dot"></span>最近活跃':ago(s.updatedAt)}</td><td><button class="row-open" aria-label="查看 ${escapeHtml(s.name)} 详情" data-detail="${escapeHtml(s.provider+':'+s.id)}"><svg viewBox="0 0 24 24"><path d="m9.5 6 6 6-6 6"/></svg></button></td></tr>`;
-  }).join('') : `<tr class="empty-row"><td colspan="7">${state.data.loading?'正在扫描本机会话记录…':'没有符合条件的会话。试试其他时间范围或清除搜索。'}</td></tr>`;
+    return `<tr><td><div class="agent-cell"><span class="agent-symbol ${s.provider}" aria-hidden="true">${LOGOS[s.provider]||''}</span><div class="agent-title"><button data-detail="${escapeHtml(s.provider+':'+s.id)}" title="${escapeHtml(s.name)}">${escapeHtml(s.name)}</button><div class="agent-subtitle"><span>${escapeHtml(server(s.project))}</span>${s.kind==='subagent'?`<span class="subagent-label">${t('row.subagent')}</span>`:''}${s.guardian?`<span class="subagent-label">${t('row.guardian')}</span>`:''}</div></div></div></td><td><span class="model-label">${escapeHtml(s.model||t('time.none'))}</span></td><td class="token-cell" title="${exact(s.usage.total)} tokens">${s.records.length?number(s.usage.total):'—'}</td><td class="cache-cell">${cache}</td><td><div class="context-cell" title="${t('row.contextTitle')}">${ctxPercent==null?t('time.none'):`<span class="context-track"><span style="width:${ctxPercent}%"></span></span>${Math.round(ctxPercent)}%`}</div></td><td class="activity-cell ${s.activity}" title="${escapeHtml(fullTime(s.updatedAt))}">${s.activity==='recent'?`<span class="live-dot"></span>${t('row.active')}`:ago(s.updatedAt)}</td><td><button class="row-open" aria-label="${escapeHtml(t('row.open', { name: s.name }))}" data-detail="${escapeHtml(s.provider+':'+s.id)}"><svg viewBox="0 0 24 24"><path d="m9.5 6 6 6-6 6"/></svg></button></td></tr>`;
+  }).join('') : `<tr class="empty-row"><td colspan="7">${state.data.loading?t('table.scanning'):t('table.empty')}</td></tr>`;
   $$('[data-detail]').forEach(b=>b.addEventListener('click',()=>openDetail(b.dataset.detail)));
 }
 
@@ -138,8 +139,8 @@ function openDetail(id) {
   const s=selectedSessions().find(s=>`${s.provider}:${s.id}`===id);
   if(!s)return;
   state.detailId=id;
-  const fields=[['输入 tokens',s.usage.input],['输出 tokens',s.usage.output],['缓存读取',s.usage.cached],['缓存写入',s.usage.cacheWrite],['推理输出（包含在输出内）',s.usage.reasoning],['合计',s.usage.total]];
-  $('#detail-content').innerHTML=`<h2>${escapeHtml(s.name)}</h2><p>${s.provider==='codex'?'Codex':'Claude Code'} · ${escapeHtml(s.project)} · ${rangeLabels[state.range]}</p><div class="detail-grid">${fields.map(([label,n])=>`<div class="detail-stat"><label>${label}</label><strong>${exact(n)}</strong></div>`).join('')}</div><div class="detail-meta"><span>会话 ID</span><code>${escapeHtml(s.id)}</code><span>最近模型</span><span>${escapeHtml(s.model||'未提供')}</span><span>父会话</span><code>${escapeHtml(s.parentId||'主会话 / 未提供')}</code><span>最后活动</span><span>${fullTime(s.updatedAt)}</span><span>已记录请求</span><span>${s.records.length} 次</span></div><p>输入包含缓存读取和写入；推理输出已包含在输出中。Token 用量不能直接换算成订阅剩余额度。${s.guardian?'此项为系统审查 agent；其 token 记录不代表会消耗订阅额度。':''}</p>`;
+  const fields=[[t('detail.input'),s.usage.input],[t('detail.output'),s.usage.output],[t('detail.cached'),s.usage.cached],[t('detail.cacheWrite'),s.usage.cacheWrite],[t('detail.reasoning'),s.usage.reasoning],[t('detail.total'),s.usage.total]];
+  $('#detail-content').innerHTML=`<h2>${escapeHtml(s.name)}</h2><p>${s.provider==='codex'?'Codex':'Claude Code'} · ${escapeHtml(server(s.project))} · ${rangeLabel(state.range)}</p><div class="detail-grid">${fields.map(([label,n])=>`<div class="detail-stat"><label>${label}</label><strong>${exact(n)}</strong></div>`).join('')}</div><div class="detail-meta"><span>${t('detail.id')}</span><code>${escapeHtml(s.id)}</code><span>${t('detail.model')}</span><span>${escapeHtml(s.model||t('time.none'))}</span><span>${t('detail.parent')}</span><code>${escapeHtml(s.parentId||t('detail.parentNone'))}</code><span>${t('detail.last')}</span><span>${fullTime(s.updatedAt)}</span><span>${t('detail.requests')}</span><span>${t('detail.requestCount', { n: s.records.length })}</span></div><p>${t('detail.note')}${s.guardian?(lang==='en'?' ':'')+t('detail.guardianNote'):''}</p>`;
   if(!$('#detail-dialog').classList.contains('open')) openDialog($('#detail-dialog'));
 }
 // Glass sheets materialize (blur + scale + opacity together) and leave along the same path.
@@ -158,17 +159,20 @@ function closeDialog(dialog){
 }
 
 function renderConnections() {
-  $('#connections-section').innerHTML = `<div class="provider-grid">${state.data.providers.map(p=>`<article class="panel connection-panel"><div class="row"><h2>${escapeHtml(p.name)}</h2><span class="connection-status">${p.connected?'已发现 '+p.fileCount+' 份记录':'暂无本地记录'}</span></div><p>${p.id==='codex'?'读取 ~/.codex/sessions 中的用量事件，额度优先使用官方 App Server；不可用时显示最近会话快照。':'读取 ~/.claude/projects 中的模型用量，自动识别子 agent，并对重复消息去重。'}</p><p>账户额度：${p.limits?.windows.length?`${escapeHtml(p.limits.source)} · ${ago(p.limits.collectedAt)}`:'等待数据'}</p>${p.id==='claude'?'<button class="quiet-button" data-setup>设置额度桥接 ↗</button>':'<a href="https://learn.chatgpt.com/docs/app-server" target="_blank" rel="noreferrer">官方接口说明 ↗</a>'}${p.error?`<p>${escapeHtml(p.error)}</p>`:''}</article>`).join('')}</div><div class="panel connection-panel source-description"><h2>这些数字，代表什么？</h2><p><b>平台额度</b>：来自平台返回的剩余百分比，供同一账户内的 agent 共享。超过重置时间的数据会等待更新，不会自动当作 100%。</p><p><b>Token 用量</b>：只统计本机未归档的会话记录。输入包含缓存，输出包含推理；重复响应去重。它不是账单金额，也不是平台额度的百分比。</p><p><b>最近活跃</b>：过去 2 分钟出现过活动记录，不代表进程一定仍在运行。上下文列是最后一次请求快照。</p><p><b>更多平台</b>：在 lib/collector.mjs 中增加 provider，并输出统一的 session / records / limits 结构即可扩展。当前已实现 Codex 与 Claude Code。</p><p>统计时区：America/New_York。关于 Claude 额度字段，请参阅 <a href="https://code.claude.com/docs/en/statusline" target="_blank" rel="noreferrer">官方状态栏文档 ↗</a>。</p></div>`;
+  $('#connections-section').innerHTML = `<div class="provider-grid">${state.data.providers.map(p=>`<article class="panel connection-panel"><div class="row"><h2>${escapeHtml(p.name)}</h2><span class="connection-status">${p.connected?t('conn.found', { n: p.fileCount }):t('conn.none')}</span></div><p>${p.id==='codex'?t('conn.codexDesc'):t('conn.claudeDesc')}</p><p>${t('conn.quota')}${p.limits?.windows.length?`${escapeHtml(server(p.limits.source))} · ${ago(p.limits.collectedAt)}`:t('conn.waiting')}</p>${p.id==='claude'?`<button class="quiet-button" data-setup>${t('conn.setup')}</button>`:`<a href="https://learn.chatgpt.com/docs/app-server" target="_blank" rel="noreferrer">${t('conn.appServer')}</a>`}${p.error?`<p>${escapeHtml(server(p.error))}</p>`:''}</article>`).join('')}</div><div class="panel connection-panel source-description">${t('conn.explainer')}</div>`;
   $$('#connections-section [data-setup]').forEach(b=>b.addEventListener('click',openSetup));
 }
 
+function viewText() {
+  const view=state.view;
+  $('#breadcrumb-current').textContent=t(`view.${view}`);
+  $('#page-title').textContent=view==='overview'&&compact?'Agent HUD':t(`title.${view}`);
+  $('#page-subtitle').textContent=t(`sub.${view}`);
+}
 function switchView(view) {
   state.view=view;
   $$('.nav-item').forEach(b=>{b.classList.toggle('active',b.dataset.view===view);b.setAttribute('aria-current',b.dataset.view===view?'page':'false');});
-  const labels={overview:'总览',sessions:'Agent 会话',connections:'数据接入'};
-  $('#breadcrumb-current').textContent=labels[view];
-  $('#page-title').textContent=view==='overview'?(compact?'Agent HUD':'每一份算力，都看得见'):view==='sessions'?'每个 Agent，清楚有数':'让数据，连接起来';
-  $('#page-subtitle').textContent=view==='overview'?'一个视野，掌握各平台用量与剩余额度。':view==='sessions'?'查看每个会话、模型和子 agent 的实际 token 用量。':'从本机会话读取用量，从平台数据读取额度。';
+  viewText();
   $('#overview-section').hidden=view!=='overview';
   $('#sessions-section').hidden=view==='connections';
   $('#connections-section').hidden=view!=='connections';
@@ -190,21 +194,39 @@ const themeIcons={
   light:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M4.6 4.6 6 6M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4 6 18M18 6l1.4-1.4"/></svg>',
   dark:'<svg viewBox="0 0 24 24"><path d="M19.5 14.5A8 8 0 0 1 9.5 4.5a8 8 0 1 0 10 10z"/></svg>',
 };
-const themeLabels={auto:'跟随系统',light:'浅色',dark:'深色'};
 let theme='auto';
 try{const stored=localStorage.getItem('agent-hud-theme');if(themeIcons[stored])theme=stored;}catch{}
 function applyTheme(){
   if(theme==='auto')delete document.documentElement.dataset.theme;else document.documentElement.dataset.theme=theme;
-  const button=$('#theme-button');button.innerHTML=themeIcons[theme];button.title=`外观：${themeLabels[theme]} · 点击切换`;button.setAttribute('aria-label',button.title);
+  const button=$('#theme-button');button.innerHTML=themeIcons[theme];button.title=t('theme.title', { name: t(`theme.${theme}`) });button.setAttribute('aria-label',button.title);
 }
-applyTheme();
-$('#theme-button').addEventListener('click',()=>{theme={auto:'light',light:'dark',dark:'auto'}[theme];try{localStorage.setItem('agent-hud-theme',theme);}catch{}applyTheme();toast(`外观：${themeLabels[theme]}`);});
+$('#theme-button').addEventListener('click',()=>{theme={auto:'light',light:'dark',dark:'auto'}[theme];try{localStorage.setItem('agent-hud-theme',theme);}catch{}applyTheme();toast(t('theme.toast', { name: t(`theme.${theme}`) }));});
+// Everything with text, re-run after a language switch. Rendered parts redraw from the last snapshot.
+function applyLanguage(){
+  applyStatic();
+  applyTheme();
+  viewText();
+  renderStatus();
+  if(setupFailed)$('#setup-command').textContent=t('setup.fallback');
+  else if(!setupCommand)$('#setup-command').textContent=t('loading');
+  render();
+  placeThumbs();
+}
+$('#lang-button').addEventListener('click',()=>{setLang(lang==='en'?'zh':'en');applyLanguage();toast(t('lang.toast'));});
 function render() {
   if(!state.data)return;
   const sessions=selectedSessions();
   renderProviders();renderStats(sessions);renderChart(sessions);renderSessions(sessions);renderConnections();
-  $('#last-sync').textContent=state.data.collectedAt?`最后扫描 ${fullTime(state.data.collectedAt)} · ET`:'正在扫描本地记录…';
+  $('#last-sync').textContent=state.data.collectedAt?t('footer.lastScan', { time: fullTime(state.data.collectedAt) }):t('footer.scanning');
   if(state.detailId&&$('#detail-dialog').classList.contains('open'))openDetail(state.detailId);
+}
+function renderStatus(){
+  const status=$('#connection-state');
+  status.classList.toggle('offline',state.online===false);
+  status.innerHTML=`<span class="live-dot"></span>${state.online===null?t('sync.connecting'):state.online?(state.data.loading?t('sync.scanning'):t('sync.live')):t('sync.offline')}`;
+  const error=state.online===false?t('error.offline'):server(state.data?.error)||'';
+  $('#error-banner').hidden=!error;
+  $('#error-banner').textContent=error;
 }
 
 async function refresh() {
@@ -215,34 +237,28 @@ async function refresh() {
     const response=await fetch('/api/snapshot',{signal:AbortSignal.timeout(10000)});
     if(!response.ok)throw new Error('http');
     state.data=await response.json();state.online=true;
-    $('#connection-state').classList.remove('offline');
-    $('#connection-state').innerHTML=`<span class="live-dot"></span>${state.data.loading?'正在扫描':'本地同步中'}`;
-    $('#error-banner').hidden=!state.data.error;
-    $('#error-banner').textContent=state.data.error||'';
+    renderStatus();
     render();
   }catch{
     state.online=false;
-    $('#connection-state').classList.add('offline');
-    $('#connection-state').innerHTML='<span class="live-dot"></span>连接已断开';
-    $('#error-banner').hidden=false;
-    $('#error-banner').textContent='本地服务暂时无法连接，当前显示最后一次快照。请确认 Agent HUD 服务仍在运行。';
+    renderStatus();
   }finally{state.loading=false;$('#refresh-button').disabled=false;}
 }
-let setupCommand='';
+let setupCommand='',setupFailed=false;
 async function openSetup(){
   openDialog($('#setup-dialog'));
-  try{const res=await fetch('/api/setup');if(!res.ok)throw new Error();setupCommand=(await res.json()).claudeCommand;$('#setup-command').textContent=setupCommand;}catch{$('#setup-command').textContent='在项目目录中运行：node scripts/connect-claude.mjs';}
+  try{const res=await fetch('/api/setup');if(!res.ok)throw new Error();setupCommand=(await res.json()).claudeCommand;setupFailed=false;$('#setup-command').textContent=setupCommand;}catch{setupFailed=!setupCommand;if(setupFailed)$('#setup-command').textContent=t('setup.fallback');}
 }
 let toastTimer;
 function toast(message){$('#toast').textContent=message;$('#toast').hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('#toast').hidden=true,3000);}
 function csvCell(value){let str=String(value??'');if(/^[=+@\-\t\r]/.test(str))str="'"+str;return '"'+str.replaceAll('"','""')+'"';}
 $('#export-button').addEventListener('click',()=>{
-  if(!state.rows.length){toast('当前筛选没有可导出的会话');return;}
-  const rows=[['平台','会话','项目','模型','范围','输入','输出','缓存读取','缓存写入','合计','最后活动'],...state.rows.map(s=>[s.provider,s.name,s.project,s.model,rangeLabels[state.range],s.usage.input,s.usage.output,s.usage.cached,s.usage.cacheWrite,s.usage.total,fullTime(s.updatedAt)])];
+  if(!state.rows.length){toast(t('toast.nothing'));return;}
+  const rows=[t('csv.headers').split('|'),...state.rows.map(s=>[s.provider,s.name,server(s.project),s.model,rangeLabel(state.range),s.usage.input,s.usage.output,s.usage.cached,s.usage.cacheWrite,s.usage.total,fullTime(s.updatedAt)])];
   const url=URL.createObjectURL(new Blob(['\ufeff'+rows.map(r=>r.map(csvCell).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'}));
-  const a=document.createElement('a');a.href=url;a.download=`agent-hud-${calendarDay(Date.now())}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);toast('已导出当前筛选结果');
+  const a=document.createElement('a');a.href=url;a.download=`agent-hud-${calendarDay(Date.now())}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);toast(t('toast.exported'));
 });
-$('#copy-setup').addEventListener('click',async()=>{try{await navigator.clipboard.writeText(setupCommand||'node scripts/connect-claude.mjs');toast('命令已复制');}catch{toast('无法访问剪贴板，请手动选择并复制命令');}});
+$('#copy-setup').addEventListener('click',async()=>{try{await navigator.clipboard.writeText(setupCommand||'node scripts/connect-claude.mjs');toast(t('toast.copied'));}catch{toast(t('toast.clipboard'));}});
 $$('[data-range]').forEach(b=>b.addEventListener('click',()=>{state.range=b.dataset.range;$$('[data-range]').forEach(x=>x.classList.toggle('selected',x===b));render();placeThumbs();}));
 $('#search-input').addEventListener('input',e=>{state.query=e.target.value;if(state.data)renderSessions(selectedSessions());});
 $('#include-system').addEventListener('change',e=>{state.includeSystem=e.target.checked;render();});
@@ -250,7 +266,7 @@ $$('[data-provider]').forEach(b=>b.addEventListener('click',()=>{state.provider=
 $$('[data-view]').forEach(b=>b.addEventListener('click',()=>switchView(b.dataset.view)));
 $('#sort-tokens').addEventListener('click',()=>{state.sort=state.sort==='tokens'?'recent':'tokens';$('#sort-tokens span').textContent=state.sort==='tokens'?'↓':'↕';render();});
 $('#refresh-button').addEventListener('click',refresh);
-$('#compact-button').addEventListener('click',()=>{if(compact){location.href='/';return;}const win=window.open('/?compact=1','agent-hud-compact','width=450,height=780,resizable=yes,scrollbars=yes');if(!win)toast('窗口被浏览器拦截，可在地址后添加 ?compact=1');});
+$('#compact-button').addEventListener('click',()=>{if(compact){location.href='/';return;}const win=window.open('/?compact=1','agent-hud-compact','width=450,height=780,resizable=yes,scrollbars=yes');if(!win)toast(t('compact.blocked'));});
 $('#close-detail').addEventListener('click',()=>closeDialog($('#detail-dialog')));
 $('#detail-dialog').addEventListener('close',()=>state.detailId=null);
 $('#close-setup').addEventListener('click',()=>closeDialog($('#setup-dialog')));
@@ -258,7 +274,7 @@ $$('dialog').forEach(dialog=>{
   dialog.addEventListener('cancel',e=>{e.preventDefault();closeDialog(dialog);});
   dialog.addEventListener('click',e=>{if(e.target===dialog){const r=dialog.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)closeDialog(dialog);}});
 });
-if(compact)$('#page-title').textContent='Agent HUD';
+applyLanguage();
 // Scroll edge: the nav hairline appears only once content passes beneath it.
 const syncNavEdge=()=>$('#nav').classList.toggle('scrolled',scrollY>8);
 addEventListener('scroll',syncNavEdge,{passive:true});syncNavEdge();

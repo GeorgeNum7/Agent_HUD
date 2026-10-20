@@ -25,8 +25,8 @@
 
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/images/dashboard-dark.png">
-    <img src="docs/images/dashboard-light.png" width="880" alt="完整面板：账户额度、用量概览与 7 天用量轨迹">
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/dashboard-dark-zh.png">
+    <img src="docs/images/dashboard-light-zh.png" width="880" alt="完整面板：账户额度、用量概览与 7 天用量轨迹">
   </picture>
   <br>
   <sub>截图使用演示数据。</sub>
@@ -38,7 +38,7 @@
 - 📊 **完整面板**：账户额度、token 用量、缓存命中率、7 天用量轨迹和每个 agent 会话，支持浅色与深色。
 - 🔒 **只在本机**：读取你自己的 Codex / Claude Code 日志，仅绑定 127.0.0.1，不保存提示词或登录凭据。
 - 📌 **不打扰**：一键置顶、靠近屏幕边缘自动贴边，服务停了会自己重启。
-- 🌐 **中文 / English**：小组件默认跟随 Windows 语言，也可在菜单中切换。
+- 🌐 **中文 / English**：面板默认跟随浏览器语言，小组件默认跟随 Windows 语言，都能一键切换。
 
 ## 快速开始
 
@@ -48,7 +48,7 @@
 
 **桌面小组件：** 运行 `powershell -ExecutionPolicy Bypass -File desktop/build.ps1` 构建，然后启动 `desktop\bin\AgentHUD.exe`（可以为它创建桌面或任务栏快捷方式）。小组件会自动启动本地服务，无需先运行 `start.ps1`。
 
-面板右上角可打开紧凑窗口（浏览器是否置顶由系统/浏览器决定），也可切换外观（跟随系统 / 浅色 / 深色）。
+面板右上角可切换语言（EN / 中）、切换外观（跟随系统 / 浅色 / 深色），也可打开紧凑窗口（浏览器是否置顶由系统/浏览器决定）。语言在手动选择前跟随浏览器，选择会被保存；本地服务发来的状态文字也会一并翻译。
 
 ## 数据与计数
 

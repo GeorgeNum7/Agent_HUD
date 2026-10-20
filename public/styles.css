@@ -181,6 +181,7 @@ svg .filled { fill: currentColor; stroke: none; }
 .icon-button:hover { background: var(--fill); }
 .icon-button:active { transform: scale(.94); }
 .icon-button svg { width: 18px; height: 18px; }
+.lang-button span { min-width: 26px; padding: 3px 0; border-radius: 7px; box-shadow: inset 0 0 0 1.5px currentColor; font-size: 11.5px; font-weight: 600; line-height: 1; letter-spacing: .02em; text-align: center; }
 #refresh-button:disabled svg { animation: spin .9s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .live-dot { display: inline-block; flex-shrink: 0; width: 7px; height: 7px; border-radius: 50%; background: var(--live); animation: pulse-dot 2.2s infinite; }
@@ -206,6 +207,8 @@ h1 { margin: 15px 0 0; font-size: clamp(32px, 6vw, 52px); font-weight: 700; lett
 .group + .group, .session-panel { margin-top: var(--group-gap); }
 .section-label { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin: 0 4px 12px; color: var(--text-2); font-size: 13px; font-weight: 500; letter-spacing: .02em; }
 .section-label.spaced { margin-top: var(--group-gap); }
+.section-label > span:first-child { flex-shrink: 0; }
+.section-label .micro { text-align: right; }
 
 /* ---------- Provider cards (two independent accounts) ---------- */
 .provider-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }

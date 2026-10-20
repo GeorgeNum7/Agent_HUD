@@ -9,17 +9,18 @@
   <svg class="svg-defs" aria-hidden="true"><defs><linearGradient id="codex-brand" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b1a7ff"/><stop offset=".5" stop-color="#7a9dff"/><stop offset="1" stop-color="#3941ff"/></linearGradient></defs></svg>
   <header class="nav" id="nav">
     <div class="nav-inner">
-      <a class="brand" href="/" aria-label="Agent HUD 首页"><img src="/icon.svg" alt=""><span>Agent HUD</span></a>
-      <nav class="nav-links" aria-label="主导航">
-        <button class="nav-item active" data-view="overview">总览</button>
-        <button class="nav-item" data-view="sessions">会话 <span class="nav-count" id="nav-count">—</span></button>
-        <button class="nav-item" data-view="connections">数据接入</button>
+      <a class="brand" href="/" aria-label="Agent HUD 首页" data-i18n-attr="aria-label:brand.home"><img src="/icon.svg" alt=""><span>Agent HUD</span></a>
+      <nav class="nav-links" aria-label="主导航" data-i18n-attr="aria-label:nav.main">
+        <button class="nav-item active" data-view="overview" data-i18n="nav.overview">总览</button>
+        <button class="nav-item" data-view="sessions"><span data-i18n="nav.sessions">会话</span> <span class="nav-count" id="nav-count">—</span></button>
+        <button class="nav-item" data-view="connections" data-i18n="nav.connections">数据接入</button>
       </nav>
       <div class="nav-actions">
-        <span id="connection-state" class="sync-state"><span class="live-dot"></span>正在连接</span>
+        <span id="connection-state" class="sync-state"><span class="live-dot"></span><span data-i18n="sync.connecting">正在连接</span></span>
+        <button id="lang-button" class="icon-button lang-button" title="Switch to English" aria-label="Switch to English" data-i18n-attr="title:lang.switch;aria-label:lang.switch"><span data-i18n="lang.button">EN</span></button>
         <button id="theme-button" class="icon-button" title="外观" aria-label="外观"></button>
-        <button id="compact-button" class="icon-button" title="打开紧凑模式" aria-label="打开紧凑模式"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="3"/><rect x="12" y="11" width="6" height="5" rx="1.2" class="filled"/></svg></button>
-        <button id="refresh-button" class="icon-button" title="刷新数据" aria-label="刷新数据"><svg viewBox="0 0 24 24"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3"/><path d="M19.5 4.5v4h-4"/></svg></button>
+        <button id="compact-button" class="icon-button" title="打开紧凑模式" aria-label="打开紧凑模式" data-i18n-attr="title:compact.open;aria-label:compact.open"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="3"/><rect x="12" y="11" width="6" height="5" rx="1.2" class="filled"/></svg></button>
+        <button id="refresh-button" class="icon-button" title="刷新数据" aria-label="刷新数据" data-i18n-attr="title:refresh;aria-label:refresh"><svg viewBox="0 0 24 24"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3"/><path d="M19.5 4.5v4h-4"/></svg></button>
       </div>
     </div>
   </header>
@@ -28,28 +29,28 @@
       <div class="eyebrow"><span class="live-dot"></span>AGENT HUD · <span id="breadcrumb-current">总览</span></div>
       <div class="hero-row">
         <div><h1 id="page-title">每一份算力，都看得见</h1><p id="page-subtitle">一个视野，掌握各平台用量与剩余额度。</p></div>
-        <div class="seg range-control" role="group" aria-label="统计时间范围"><span class="seg-thumb" aria-hidden="true"></span><button data-range="today">今天</button><button data-range="7d" class="selected">7 天</button><button data-range="30d">30 天</button><button data-range="all">全部</button></div>
+        <div class="seg range-control" role="group" aria-label="统计时间范围" data-i18n-attr="aria-label:range.aria"><span class="seg-thumb" aria-hidden="true"></span><button data-range="today" data-i18n="range.today">今天</button><button data-range="7d" class="selected" data-i18n="range.7d">7 天</button><button data-range="30d" data-i18n="range.30d">30 天</button><button data-range="all" data-i18n="range.all">全部</button></div>
       </div>
     </section>
     <div id="error-banner" class="error-banner" role="status" hidden></div>
     <section id="overview-section" class="group">
-      <div class="section-label"><span>账户额度</span><span id="quota-updated" class="micro">平台内共享 · 以平台返回值为准</span></div>
-      <div id="provider-cards" class="provider-grid"><div class="skeleton">正在读取本地额度…</div><div class="skeleton">正在读取本地额度…</div></div>
-      <div class="section-label spaced"><span>用量概览</span></div>
+      <div class="section-label"><span data-i18n="quota.section">账户额度</span><span id="quota-updated" class="micro" data-i18n="quota.note">平台内共享 · 以平台返回值为准</span></div>
+      <div id="provider-cards" class="provider-grid"><div class="skeleton" data-i18n="quota.loading">正在读取本地额度…</div><div class="skeleton" data-i18n="quota.loading">正在读取本地额度…</div></div>
+      <div class="section-label spaced"><span data-i18n="usage.section">用量概览</span></div>
       <div id="summary-stats" class="stats-grid"></div>
-      <section class="panel chart-panel"><div class="panel-heading"><div><h2>用量轨迹 <span class="micro" id="chart-range"></span></h2><p>模型处理的 token 总量，包含缓存读取</p></div><div class="legend"><span><i class="codex-dot"></i>Codex</span><span><i class="claude-dot"></i>Claude Code</span></div></div><div id="usage-chart" class="usage-chart"></div></section>
+      <section class="panel chart-panel"><div class="panel-heading"><div><h2><span data-i18n="chart.title">用量轨迹</span> <span class="micro" id="chart-range"></span></h2><p data-i18n="chart.sub">模型处理的 token 总量，包含缓存读取</p></div><div class="legend"><span><i class="codex-dot"></i>Codex</span><span><i class="claude-dot"></i>Claude Code</span></div></div><div id="usage-chart" class="usage-chart"></div></section>
     </section>
     <section id="sessions-section" class="panel session-panel">
-      <div class="panel-heading"><div><h2>Agent 会话 <span id="session-count" class="count-pill">0</span></h2><p>按最近活动排序，点击会话查看用量明细</p></div><button id="export-button" class="quiet-button"><svg viewBox="0 0 24 24"><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19.5h14"/></svg>导出 CSV</button></div>
-      <div class="table-toolbar"><div class="seg" role="group" aria-label="平台筛选"><span class="seg-thumb" aria-hidden="true"></span><button data-provider="all" class="selected">全部平台</button><button data-provider="codex">Codex</button><button data-provider="claude">Claude Code</button></div><label class="search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></svg><input id="search-input" placeholder="搜索会话、项目或模型" aria-label="搜索会话、项目或模型"></label></div>
-      <div class="table-wrap"><table><thead><tr><th>Agent / 项目</th><th>模型</th><th><button id="sort-tokens">Tokens <span>↕</span></button></th><th>缓存命中</th><th>上下文</th><th>最近活动</th><th></th></tr></thead><tbody id="sessions-body"></tbody></table></div>
-      <div class="table-footer"><label><input type="checkbox" id="include-system"> 显示系统审查 agent</label><span id="table-note">正在加载…</span></div>
+      <div class="panel-heading"><div><h2><span data-i18n="sessions.title">Agent 会话</span> <span id="session-count" class="count-pill">0</span></h2><p data-i18n="sessions.sub">按最近活动排序，点击会话查看用量明细</p></div><button id="export-button" class="quiet-button"><svg viewBox="0 0 24 24"><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19.5h14"/></svg><span data-i18n="export">导出 CSV</span></button></div>
+      <div class="table-toolbar"><div class="seg" role="group" aria-label="平台筛选" data-i18n-attr="aria-label:filter.aria"><span class="seg-thumb" aria-hidden="true"></span><button data-provider="all" class="selected" data-i18n="filter.all">全部平台</button><button data-provider="codex">Codex</button><button data-provider="claude">Claude Code</button></div><label class="search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></svg><input id="search-input" placeholder="搜索会话、项目或模型" aria-label="搜索会话、项目或模型" data-i18n-attr="placeholder:search.placeholder;aria-label:search.placeholder"></label></div>
+      <div class="table-wrap"><table><thead><tr><th data-i18n="th.agent">Agent / 项目</th><th data-i18n="th.model">模型</th><th><button id="sort-tokens">Tokens <span>↕</span></button></th><th data-i18n="th.cache">缓存命中</th><th data-i18n="th.context">上下文</th><th data-i18n="th.activity">最近活动</th><th></th></tr></thead><tbody id="sessions-body"></tbody></table></div>
+      <div class="table-footer"><label><input type="checkbox" id="include-system"> <span data-i18n="system.toggle">显示系统审查 agent</span></label><span id="table-note" data-i18n="loading">正在加载…</span></div>
     </section>
     <section id="connections-section" hidden></section>
-    <footer class="page-footer"><span>只读本机会话记录 · 每 5 秒刷新</span><span id="last-sync">等待首次同步</span></footer>
+    <footer class="page-footer"><span data-i18n="footer.note">只读本机会话记录 · 每 5 秒刷新</span><span id="last-sync" data-i18n="footer.waiting">等待首次同步</span></footer>
   </main>
-  <dialog id="detail-dialog"><div class="dialog-header"><span class="eyebrow">AGENT 详情</span><button class="close-button" id="close-detail" aria-label="关闭详情"><svg viewBox="0 0 24 24"><path d="M7 7l10 10M17 7 7 17"/></svg></button></div><div id="detail-content"></div></dialog>
-  <dialog id="setup-dialog"><div class="dialog-header"><span class="eyebrow">接入 CLAUDE CODE CLI</span><button class="close-button" id="close-setup" aria-label="关闭接入说明"><svg viewBox="0 0 24 24"><path d="M7 7l10 10M17 7 7 17"/></svg></button></div><h2>通过终端版接入 Claude 额度</h2><p>此桥接使用 Claude Code CLI 的状态栏回调。桌面版需启用单独的账户连接，不能通过安装终端状态栏来接入。</p><ol><li>在 PowerShell 中运行下方命令。它会备份设置，并保留其他配置；已有自定义状态栏时会停止，不覆盖。</li><li>重新打开终端中的 Claude Code CLI，在正常使用并收到模型响应后等待同步。</li></ol><div class="command-box"><code id="setup-command">正在加载…</code><button id="copy-setup" class="quiet-button">复制命令</button></div><p class="muted">额度字段取决于账户类型和版本；状态栏运行不保证返回额度。无需为 HUD 额外发送请求。</p><p class="dialog-links"><a href="https://claude.ai/settings/usage" target="_blank" rel="noreferrer">查看 Claude 官方用量 ↗</a><a href="https://code.claude.com/docs/en/statusline" target="_blank" rel="noreferrer">状态栏说明 ↗</a></p></dialog>
+  <dialog id="detail-dialog"><div class="dialog-header"><span class="eyebrow" data-i18n="detail.eyebrow">AGENT 详情</span><button class="close-button" id="close-detail" aria-label="关闭详情" data-i18n-attr="aria-label:detail.close"><svg viewBox="0 0 24 24"><path d="M7 7l10 10M17 7 7 17"/></svg></button></div><div id="detail-content"></div></dialog>
+  <dialog id="setup-dialog"><div class="dialog-header"><span class="eyebrow" data-i18n="setup.eyebrow">接入 CLAUDE CODE CLI</span><button class="close-button" id="close-setup" aria-label="关闭接入说明" data-i18n-attr="aria-label:setup.close"><svg viewBox="0 0 24 24"><path d="M7 7l10 10M17 7 7 17"/></svg></button></div><h2 data-i18n="setup.title">通过终端版接入 Claude 额度</h2><p data-i18n="setup.intro">此桥接使用 Claude Code CLI 的状态栏回调。桌面版需启用单独的账户连接，不能通过安装终端状态栏来接入。</p><ol><li data-i18n="setup.step1">在 PowerShell 中运行下方命令。它会备份设置，并保留其他配置；已有自定义状态栏时会停止，不覆盖。</li><li data-i18n="setup.step2">重新打开终端中的 Claude Code CLI，在正常使用并收到模型响应后等待同步。</li></ol><div class="command-box"><code id="setup-command">正在加载…</code><button id="copy-setup" class="quiet-button" data-i18n="setup.copy">复制命令</button></div><p class="muted" data-i18n="setup.note">额度字段取决于账户类型和版本；状态栏运行不保证返回额度。无需为 HUD 额外发送请求。</p><p class="dialog-links"><a href="https://claude.ai/settings/usage" target="_blank" rel="noreferrer" data-i18n="setup.usage">查看 Claude 官方用量 ↗</a><a href="https://code.claude.com/docs/en/statusline" target="_blank" rel="noreferrer" data-i18n="setup.docs">状态栏说明 ↗</a></p></dialog>
   <div id="toast" class="toast" role="status" hidden></div>
   <script type="module" src="/app.js"></script>
 </body></html>
